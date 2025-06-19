@@ -125,11 +125,7 @@ class Model(nn.Module):
                  D_m_v=512,
                  D_m_a=100,
                  modals='avl',
-                 att_type='concat_DHT',
-                 modals_using_lstm = "avt", 
                  dataset='IEMOCAP',
-                 modals_spk_emb = "avt",
-                 num_L = 3,
                  num_K = 4,
                  original_gcn=False,
                  graph_masking=True):
@@ -149,7 +145,6 @@ class Model(nn.Module):
         
         self.return_feature = True
         self.modals = [x for x in modals]  # a, v, l
-        self.att_type = att_type
         self.normBNa = nn.BatchNorm1d(1024, affine=True)
         self.normBNb = nn.BatchNorm1d(1024, affine=True)
         self.normBNc = nn.BatchNorm1d(1024, affine=True)
@@ -222,15 +217,10 @@ class Model(nn.Module):
         emotions_a, _ = self.lstm_a(U_a)
         emotions_v, _ = self.lstm_v(U_v)
         emotions_t, _ = self.lstm_t(U_t)
-        
             
-        
-    
         emotions_a = self.align(emotions_a, emotions_t) 
         emotions_v = self.align(emotions_v, emotions_t) 
-                    
     
-
         features_a = simple_batch_graphify(emotions_a, seq_lengths)
         features_v = simple_batch_graphify(emotions_v, seq_lengths)
         features_t = simple_batch_graphify(emotions_t, seq_lengths)
