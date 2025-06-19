@@ -170,43 +170,25 @@ class Model(nn.Module):
        
         self.dataset = dataset
 
-        if self.base_model == 'LSTM':
-            if not self.multi_modal:
-                if len(self.modals) == 3:
-                    hidden_ = 250
-                elif ''.join(self.modals) == 'al':
-                    hidden_ = 150
-                elif ''.join(self.modals) == 'vl':
-                    hidden_ = 150
-                else:
-                    hidden_ = 100
-                self.linear_ = nn.Linear(D_m, hidden_)
-                self.lstm = nn.LSTM(input_size=hidden_, hidden_size=D_e, num_layers=2, bidirectional=True, dropout=dropout)
-            else:
-                if 'a' in self.modals:
-                    hidden_a = D_g
-                    self.linear_a = nn.Linear(D_m_a, hidden_a)
-                    if self.av_using_lstm:
-                        self.lstm_a = nn.LSTM(input_size=hidden_a, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
-                if 'v' in self.modals:
-                    hidden_v = D_g
-                    self.linear_v = nn.Linear(D_m_v, hidden_v)
-                    if self.av_using_lstm:
-                        self.lstm_v = nn.LSTM(input_size=hidden_v, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
-                if 'l' in self.modals:
-                    hidden_l = D_g
-                    self.linear_l = nn.Linear(D_m, hidden_l)
-                    self.lstm_l = nn.LSTM(input_size=hidden_l, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
-
        
-        if self.modality_self_attention:
-            
-            self.a_align = MultiHeadCrossModalAttention(D_g, D_g, D_g, 2) 
-            self.v_align = MultiHeadCrossModalAttention(D_g, D_g, D_g, 2) 
-            self.l_align = MultiHeadCrossModalAttention(D_g, D_g, D_g, 2) 
+    
         
-        else:
-            self.align = MultiHeadCrossModalAttention(D_g, D_g, D_g, 2) 
+        hidden_a = D_g
+        self.linear_a = nn.Linear(D_m_a, hidden_a)
+        if self.av_using_lstm:
+            self.lstm_a = nn.LSTM(input_size=hidden_a, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
+    
+        hidden_v = D_g
+        self.linear_v = nn.Linear(D_m_v, hidden_v)
+        if self.av_using_lstm:
+            self.lstm_v = nn.LSTM(input_size=hidden_v, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
+    
+        hidden_l = D_g
+        self.linear_l = nn.Linear(D_m, hidden_l)
+        self.lstm_l = nn.LSTM(input_size=hidden_l, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
+
+ 
+        self.align = MultiHeadCrossModalAttention(D_g, D_g, D_g, 2) 
 
         self.graph_model = GCN(n_dim=D_g, nhidden=graph_hidden_size, 
                                         dropout=self.dropout, lamda=0.5, alpha=0.1, variant=True, return_feature=self.return_feature, use_residue=self.use_residue, n_speakers=n_speakers, modals=self.modals, use_speaker=self.use_speaker,  num_L=num_L, num_K=num_K, original_gcn=self.original_gcn, graph_masking=self.graph_masking)
