@@ -15,7 +15,7 @@ class GCN(nn.Module):
                  n_speakers=2,
                  modals=['a','v','l'],
                  use_speaker=True,
-                 num_K=4,
+                 num_graph_layers=4,
                  original_gcn=False,
                  graph_masking=True):
         super(GCN, self).__init__()
@@ -35,9 +35,9 @@ class GCN(nn.Module):
         self.use_speaker = use_speaker
         #------------------------------------    
         self.fc1 = nn.Linear(n_dim, nhidden)         
-        self.num_K =  num_K
+        self.num_graph_layers =  num_graph_layers
         
-        for kk in range(num_K):
+        for kk in range(self.num_graph_layers):
             setattr(self,'conv%d' %(kk+1), GraphGCN(nhidden, nhidden,  graph_masking=self.graph_masking))
 
     def forward(self, a, v, l, dia_len, qmask, epoch):
@@ -59,7 +59,7 @@ class GCN(nn.Module):
         x1 = self.fc1(gnn_features)  
         out = x1
         gnn_out = x1
-        for kk in range(self.num_K):
+        for kk in range(self.num_graph_layers):
             gnn_out = gnn_out + getattr(self,'conv%d' %(kk+1))(gnn_out,gnn_edge_index)
 
         out2 = torch.cat([out,gnn_out], dim=1)

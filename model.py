@@ -114,7 +114,6 @@ class MultiHeadCrossModalAttention(nn.Module):
 class Model(nn.Module):
 
     def __init__(self, 
-                 base_model, 
                  D_m,
                  D_g, 
                  graph_hidden_size, 
@@ -130,10 +129,8 @@ class Model(nn.Module):
                  graph_masking=True):
         
         super(Model, self).__init__()
-        self.original_gcn = original_gcn
         self.graph_masking = graph_masking
 
-        self.base_model = base_model
        
        
         
@@ -182,7 +179,7 @@ class Model(nn.Module):
                                
                                return_feature=self.return_feature,
                                n_speakers=n_speakers, 
-                               num_K=num_K,
+                               num_graph_layers=num_graph_layers,
                                graph_masking=self.graph_masking)
 
         

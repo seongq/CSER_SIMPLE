@@ -85,7 +85,14 @@ def get_IEMOCAP_loaders(batch_size=32, valid=0.1, num_workers=0, pin_memory=Fals
     return train_loader, valid_loader, test_loader
     
 
-def train_or_eval_graph_model(model, loss_function, dataloader, epoch, cuda, modals, optimizer=None, train=False, dataset='IEMOCAP'):
+def train_or_eval_graph_model(model,
+                              loss_function, 
+                              dataloader, 
+                              epoch, 
+                              cuda,
+                              optimizer=None, 
+                              train=False,
+                              ):
     losses, preds, labels = [], [], []
     vids = []
 
@@ -102,27 +109,8 @@ def train_or_eval_graph_model(model, loss_function, dataloader, epoch, cuda, mod
         
         textf1,textf2,textf3,textf4, visuf, acouf, qmask, umask, label = [d.to(device) for d in data[:-2]] if cuda else data[:-2]
         
-        if args.multi_modal:            
-            if modals == 'avl':
-                textf = torch.cat([acouf, visuf, textf1,textf2,textf3,textf4],dim=-1)
-            elif modals == 'av':
-                textf = torch.cat([acouf, visuf],dim=-1)
-            elif modals == 'vl':
-                textf = torch.cat([visuf, textf1,textf2,textf3,textf4],dim=-1)
-            elif modals == 'al':
-                textf = torch.cat([acouf, textf1,textf2,textf3,textf4],dim=-1)
-            else:
-                raise NotImplementedError
-        
-        else:
-            if modals == 'a':
-                textf = acouf
-            elif modals == 'v':
-                textf = visuf
-            elif modals == 'l':
-                textf = textf
-            else:
-                raise NotImplementedError
+
+        textf = torch.cat([acouf, visuf, textf1,textf2,textf3,textf4],dim=-1)
         
         lengths = [(umask[j] == 1).nonzero(as_tuple=False).tolist()[-1][0] + 1 for j in range(len(umask))]
 
@@ -162,7 +150,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--no_cuda', action='store_true', default=False, help='does not use GPU')
-    parser.add_argument('--base_model', default='LSTM')
     parser.add_argument('--lr', type=float, default=0.0001, metavar='LR', help='learning rate')
     parser.add_argument('--l2', type=float, default=0.00003, metavar='L2', help='L2 regularization weight')
     parser.add_argument('--dropout', type=float, default=0.5, metavar='dropout', help='dropout rate')
@@ -172,13 +159,12 @@ if __name__ == '__main__':
     parser.add_argument('--use_topic', action='store_true', default=False, help='whether to use topic information')
     parser.add_argument('--alpha', type=float, default=0.2, help='alpha')
 
-    parser.add_argument('--use_gcn', action='store_true', default=False, help='whether to combine spectral and none-spectral methods or not')
     parser.add_argument('--use_residue', action='store_true', default=False, help='whether to use residue information or not')
     parser.add_argument('--multi_modal', action='store_true', default=True, help='whether to use multimodal information')
     parser.add_argument('--mm_fusion_mthd', default='concat_DHT', help='method to use multimodal information: concat, gated, concat_subsequently')
     parser.add_argument('--modals', default='avl', help='modals to fusion')
     parser.add_argument('--Dataset', default='IEMOCAP', help='dataset to train and test', choices = ("IEMOCAP", "MELD"))
-    parser.add_argument('--num_K', type=int, default=4, help='num_convs')
+    parser.add_argument('--num_graph_layers', type=int, default=4, help='num of GNN layers')
     parser.add_argument("--seed_number", type=int, default=1, required=True)
     parser.add_argument("--graph_masking", default=True, action="store_false")
     args = parser.parse_args()
@@ -219,17 +205,8 @@ if __name__ == '__main__':
     D_visual = feat2dim['denseface']
     D_text = 1024 #feat2dim['textCNN'] if args.Dataset=='IEMOCAP' else feat2dim['MELD_text']
 
-    if args.multi_modal:
-        D_m = 1024
-    else:
-        if modals == 'a':
-            D_m = D_audio
-        elif modals == 'v':
-            D_m = D_visual
-        elif modals == 'l':
-            D_m = D_text
-        else:
-            raise NotImplementedError
+    D_m = 1024
+    
     D_g = 512 if args.Dataset=='IEMOCAP' else 1024
     D_p = 150
     D_e = 100
@@ -244,8 +221,7 @@ if __name__ == '__main__':
 
     seed_everything(seed_number)
     print(n_speakers)
-    model = Model(args.base_model,
-                  D_m, 
+    model = Model(D_m, 
                   D_g, 
                   graph_h,
                   n_speakers=n_speakers,
@@ -255,10 +231,9 @@ if __name__ == '__main__':
                   D_m_v = D_visual,
                   D_m_a = D_audio,
                   dataset=args.Dataset,
-                  num_K = args.num_K,
+                  num_graph_layers = args.num_graph_layers,
                   graph_masking=args.graph_masking)
 
-    print ('Graph NN with', args.base_model, 'as base model.')
     name = 'Graph'
 
     if cuda:
@@ -317,12 +292,28 @@ if __name__ == '__main__':
         print(f"epoch: {e}")
         start_time = time.time()
 
-        train_loss, train_acc, _, _, train_fscore, _ = train_or_eval_graph_model(model,  loss_function, train_loader, e, cuda, args.modals, \
-                                                                                 optimizer, True, dataset=args.Dataset)
-        valid_loss, valid_acc, _, _, valid_fscore = train_or_eval_graph_model(model,  loss_function, valid_loader, e, cuda, args.modals, \
-                                                                              dataset=args.Dataset,)
-        test_loss, test_acc, test_label, test_pred, test_fscore, _ = train_or_eval_graph_model(model, loss_function, test_loader, e, cuda, args.modals, \
-                                                                                               dataset=args.Dataset)
+        train_loss, train_acc, _, _, train_fscore, _ = train_or_eval_graph_model(model,  
+                                                                                 loss_function,
+                                                                                 train_loader,
+                                                                                 e, 
+                                                                                 cuda,
+                                                                                 optimizer,
+                                                                                 True,
+                                                                                 )
+        
+        
+        valid_loss, valid_acc, _, _, valid_fscore = train_or_eval_graph_model(model, 
+                                                                              loss_function, 
+                                                                              valid_loader,
+                                                                              e, 
+                                                                              cuda,                   
+                                                                              )
+        test_loss, test_acc, test_label, test_pred, test_fscore, _ = train_or_eval_graph_model(model,
+                                                                                               loss_function,
+                                                                                               test_loader,
+                                                                                               e,
+                                                                                               cuda
+                                                                                               )
         all_fscore.append(test_fscore)
         all_acc.append(test_acc)
 
