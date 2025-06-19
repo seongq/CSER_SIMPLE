@@ -14,8 +14,10 @@ class GCN(nn.Module):
                  use_speaker=True,
                  num_graph_layers=4,
                  original_gcn=False,
-                 graph_masking=True):
+                 graph_masking=True,
+                 spk_embs = None):
         super(GCN, self).__init__()
+        self.spk_embs = spk_embs
         self.return_feature = return_feature  #True
         
 
@@ -39,12 +41,12 @@ class GCN(nn.Module):
         spk_idx = torch.argmax(qmask, dim=-1)
         spk_emb_vector = self.speaker_embeddings(spk_idx)
         
-        
-        l += spk_emb_vector
-
-        a += spk_emb_vector
-
-        v += spk_emb_vector
+        if "t" in self.spk_embs:
+            l += spk_emb_vector
+        elif "a" in self.spk_embs:
+            a += spk_emb_vector
+        elif "v" in self.spk_embs:
+            v += spk_emb_vector
 
            
         

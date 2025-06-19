@@ -4,3 +4,5 @@ result/*
 save_folder
 __pycache__/
 *.pyc
+*.ipynb
+run*

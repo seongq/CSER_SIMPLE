@@ -123,9 +123,17 @@ class Model(nn.Module):
                  D_m_v=512,
                  D_m_a=100,
                  num_graph_layers = 4,
-                 graph_masking=True):
+                 graph_masking=True, 
+                 spk_embs = None,
+                 using_lstms = None,
+                 aligns = None):
         
         super(Model, self).__init__()
+        
+        self.spk_embs = spk_embs
+        self.using_lstms = using_lstms
+        self.aligns = aligns
+        
         self.graph_masking = graph_masking
 
        
@@ -153,15 +161,20 @@ class Model(nn.Module):
         hidden_t = D_g
 
         self.linear_a = nn.Linear(D_m_a, hidden_a)
-        self.lstm_a = nn.LSTM(input_size=hidden_a, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=self.dropout)
+        if "a" in self.using_lstms:
+            self.lstm_a = nn.LSTM(input_size=hidden_a, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=self.dropout)
     
         
         self.linear_v = nn.Linear(D_m_v, hidden_v)
-        self.lstm_v = nn.LSTM(input_size=hidden_v, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=self.dropout)
+        
+        if "v" in self.using_lstms:
+            self.lstm_v = nn.LSTM(input_size=hidden_v, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=self.dropout)
     
         
         self.linear_t = nn.Linear(D_m, hidden_t)
-        self.lstm_t = nn.LSTM(input_size=hidden_t, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=self.dropout)
+        
+        if "t" in self.using_lstms:
+            self.lstm_t = nn.LSTM(input_size=hidden_t, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=self.dropout)
 
  
         self.align = MultiHeadCrossModalAttention(D_g, D_g, D_g, 2) 
@@ -172,7 +185,8 @@ class Model(nn.Module):
                                return_feature=self.return_feature,
                                n_speakers=n_speakers, 
                                num_graph_layers=num_graph_layers,
-                               graph_masking=self.graph_masking)
+                               graph_masking=self.graph_masking,
+                               spk_embs = self.spk_embs,)
 
         
         self.dropout_ = nn.Dropout(self.dropout)
@@ -197,13 +211,36 @@ class Model(nn.Module):
         U_v = self.linear_v(U_v)
         U_t = self.linear_t(U_t)
         
-        emotions_a, _ = self.lstm_a(U_a)
-        emotions_v, _ = self.lstm_v(U_v)
-        emotions_t, _ = self.lstm_t(U_t)
+        
+        if "a" in self.using_lstms:
+            emotions_a, _ = self.lstm_a(U_a)
+        else:
+            emotions_a = U_a
+        if "v" in self.using_lstms:
+            emotions_v, _ = self.lstm_v(U_v)
+        else:
+            emotions_v = U_v
+        if "t" in self.using_lstms:
+            emotions_t, _ = self.lstm_t(U_t)
+        else:
+            emotions_t = U_t
+        
+        if self.aligns=="to_t":
             
-        emotions_a = self.align(emotions_a, emotions_t) 
-        emotions_v = self.align(emotions_v, emotions_t) 
+            emotions_a = self.align(emotions_a, emotions_t) 
+            emotions_v = self.align(emotions_v, emotions_t) 
     
+        elif self.aligns=="to_v":
+            emotions_a = self.align(emotions_a, emotions_v)
+            emotions_t = self.align(emotions_t, emotions_v)
+            
+        elif self.aligns == "to_a":
+            emotions_v = self.align(emotions_v, emotions_a)
+            emotions_t = self.align(emotions_t, emotions_a)
+            
+        elif self.aligns == "NO":
+            pass
+            
         features_a = simple_batch_graphify(emotions_a, seq_lengths)
         features_v = simple_batch_graphify(emotions_v, seq_lengths)
         features_t = simple_batch_graphify(emotions_t, seq_lengths)

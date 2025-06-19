@@ -2,7 +2,8 @@ import os
 import pickle
 from datetime import datetime
 import pytz
-
+import json
+from pathlib import Path
 import numpy as np, argparse, time, random
 import torch
 import torch.nn as nn
@@ -153,16 +154,16 @@ if __name__ == '__main__':
     parser.add_argument('--l2', type=float, default=0.00003, metavar='L2', help='L2 regularization weight')
     parser.add_argument('--dropout', type=float, default=0.5, metavar='dropout', help='dropout rate')
     parser.add_argument('--batch_size', type=int, default=16, metavar='BS', help='batch size')
-    parser.add_argument('--epochs', type=int, default=300, metavar='E', help='number of epochs')
+    parser.add_argument('--epochs', type=int, default=999, metavar='E', help='number of epochs')
 
     parser.add_argument('--Dataset', default='IEMOCAP', help='dataset to train and test', choices = ("IEMOCAP", "MELD"))
     parser.add_argument('--num_graph_layers', type=int, default=4, help='num of GNN layers')
     parser.add_argument("--seed_number", type=int, default=1, required=True)
     parser.add_argument("--graph_masking", default=True, action="store_false")
     
-    parser.add_argument("--spk_embs", default='avt', choices= ('a', 'v', 't', 'av', 'at', 'vt', 'avt'))
-    parser.add_argument("--using_lstms", default="avt", choices= ('a', 'v', 't', 'av', 'at', 'vt', 'avt'))
-    parser.add_argument("--aligns", default="to_t", choices= ("to_a", "to_v", "to_t"))
+    parser.add_argument("--spk_embs", default='avt', choices= ("NO", 'a', 'v', 't', 'av', 'at', 'vt', 'avt'))
+    parser.add_argument("--using_lstms", default="avt", choices= ("NO", 'a', 'v', 't', 'av', 'at', 'vt', 'avt'))
+    parser.add_argument("--aligns", default="to_t", choices= ("NO", "to_a", "to_v", "to_t"))
     args = parser.parse_args()
     
     
@@ -171,7 +172,7 @@ if __name__ == '__main__':
     timestamp_str = now_kst.strftime("%Y%m%d%H%M")
     print(args)
     
-    main_name = "spk_embs_"+args.spk_embs+"_"+"using_lstms_"+args.using_lstms+"_"+"aligns_"+args.aligns+"_datasets_"+args.Dataset+"_"+"seed_"+str(args.seed_number)+f"_{timestamp_str}"
+    main_name = "gnn_layers_"+str(args.num_graph_layers)+"_spk_embs_"+args.spk_embs+"_"+"using_lstms_"+args.using_lstms+"_"+"aligns_"+args.aligns+"_datasets_"+args.Dataset+"_"+"seed_"+str(args.seed_number)+f"_{timestamp_str}"
     
         
         
@@ -224,7 +225,11 @@ if __name__ == '__main__':
                   D_m_v = D_visual,
                   D_m_a = D_audio,
                   num_graph_layers = args.num_graph_layers,
-                  graph_masking=args.graph_masking)
+                  graph_masking=args.graph_masking,
+                  spk_embs=args.spk_embs,
+                    using_lstms = args.using_lstms,
+                    aligns =args.aligns                  
+                  )
 
 
     if cuda:
@@ -282,14 +287,7 @@ if __name__ == '__main__':
             COLUMNS = []
             COLUMNS.append('epoch')
             
-            COLUMNS.append('spk_embs')
-            COLUMNS.append("using_lstms")
-            COLUMNS.append("aligns")
-            COLUMNS.append("Dataset")
-            COLUMNS.append("seed_number")
-            COLUMNS.append("timestamp_str")
-            COLUMNS.append("model_path")
-            
+          
             COLUMNS.append("train_loss")
             COLUMNS.append("train_acc")
             COLUMNS.append("train_fscore")
@@ -297,15 +295,22 @@ if __name__ == '__main__':
             COLUMNS.append("test_acc")
             COLUMNS.append("test_fscore")
             
-            COLUMNS.append("ACC")
             for i in range(n_classes):
                 COLUMNS.append(f'ACC_{i}')
                 
-            COLUMNS.append("F1")
+
             for i in range(n_classes):
                 COLUMNS.append(f"F1_{i}")
                 
             writer.writerow(COLUMNS)
+    
+    
+    args_save_path = os.path.join(model_save_dir, "settings.json")
+    
+    # Namespace → dict 변환 후 저장
+    with open(args_save_path, "w") as f:
+        json.dump(vars(args), f, indent=4)
+    
     
     for e in range(n_epochs):
         epoch = str(e).zfill(3)
@@ -347,26 +352,18 @@ if __name__ == '__main__':
         weighted_accuracy = f1_metrics['weighted_accuracy']
         weighted_f1 = f1_metrics['weighted_f1']
 
-        filename = f"epoch_{epoch}_f1_{test_fscore:.2f}_acc_{test_acc:.2f}__seed_{seed_number}.pth"
+        filename = f"epoch_{epoch}.pth"
         model_path = os.path.join(model_save_dir, filename)
         
         
-        
-        result_dictionary = {
-            'epoch': epoch,
-            'f1_w': weighted_f1,
-            'acc_w': weighted_accuracy,
-            'train_loss': train_loss,
-            'train_acc': train_acc,
-            'train_fscore': train_fscore,
-            'test_loss': test_loss,
-            'test_acc': test_acc,
-            'test_fscore': test_fscore,
-            'seed': seed_number
-        }
-
-        
-        result_dictionary['path'] = model_path
+        with open(csv_path, mode='a', newline='') as f:
+            writer = csv.writer(f)
+            CONTENTS = [epoch, train_loss, train_acc, train_fscore, test_loss, test_acc, test_fscore ]
+            for i in range(n_classes): #ACC
+                CONTENTS.append(round(class_accuracy[i], 2))
+            for i in range(n_classes): #F1
+                CONTENTS.append(round(class_f1[i], 2))
+            writer.writerow(CONTENTS)
 
         # 모델 저장
         torch.save({
