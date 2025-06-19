@@ -214,7 +214,7 @@ if __name__ == '__main__':
 
 
     seed_everything(seed_number)
-    print(n_speakers)
+    # print(n_speakers)
     model = Model(D_m, 
                   D_g, 
                   graph_h,
@@ -226,7 +226,6 @@ if __name__ == '__main__':
                   num_graph_layers = args.num_graph_layers,
                   graph_masking=args.graph_masking)
 
-    name = 'Graph'
 
     if cuda:
         model.to(device)
@@ -265,18 +264,16 @@ if __name__ == '__main__':
 
 
 
-    model_save_dir = os.path.join("./save_folder", args.Dataset, f"original___graphmasking_{args.graph_masking}")
+    model_save_dir = os.path.join("./save_folder", main_name)
     os.makedirs(model_save_dir, exist_ok=True)
     
     
-    pickle_path = os.path.join(f"./result/{args.Dataset}", "result.pkl")
+    csv_path = os.path.join(f"./save_folder/main_name", "results.csv")
     
-    temporary_pickle_dir_path = os.path.dirname(pickle_path)
-    os.makedirs(temporary_pickle_dir_path, exist_ok=True)
+    temporary_csv_dir_path = os.path.dirname(csv_path)
+    os.makedirs(temporary_csv_dir_path, exist_ok=True)
     
     
-    best_f1_model_path = None
-    best_acc_model_path = None
     for e in range(n_epochs):
         print(f"epoch: {e}")
         start_time = time.time()
