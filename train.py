@@ -110,7 +110,6 @@ def train_or_eval_graph_model(model,
         textf1,textf2,textf3,textf4, visuf, acouf, qmask, umask, label = [d.to(device) for d in data[:-2]] if cuda else data[:-2]
         
 
-        textf = torch.cat([acouf, visuf, textf1,textf2,textf3,textf4],dim=-1)
         
         lengths = [(umask[j] == 1).nonzero(as_tuple=False).tolist()[-1][0] + 1 for j in range(len(umask))]
 
@@ -221,7 +220,6 @@ if __name__ == '__main__':
                   dropout=args.dropout,
                   D_m_v = D_visual,
                   D_m_a = D_audio,
-                  dataset=args.Dataset,
                   num_graph_layers = args.num_graph_layers,
                   graph_masking=args.graph_masking)
 
@@ -241,7 +239,6 @@ if __name__ == '__main__':
     if args.Dataset == 'MELD':
         loss_function = FocalLoss()
     else:
-        #loss_function = FocalLoss()
         loss_function  = nn.NLLLoss(loss_weights.to(device) if cuda else loss_weights)
 
 

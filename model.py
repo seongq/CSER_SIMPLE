@@ -209,7 +209,7 @@ class Model(nn.Module):
         features_t = simple_batch_graphify(emotions_t, seq_lengths)
             
         
-        emotions_feat = self.graph_model(features_a, features_v, features_t, seq_lengths, qmask, epoch)        
+        emotions_feat = self.graph_model(features_a, features_v, features_t, seq_lengths, qmask)        
         emotions_feat = self.dropout_(emotions_feat)        
         emotions_feat = nn.ReLU()(emotions_feat)
         log_prob = F.log_softmax(self.smax_fc(emotions_feat), 1)

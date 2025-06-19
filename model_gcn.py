@@ -11,7 +11,6 @@ class GCN(nn.Module):
                  dropout,
                  return_feature,
                  n_speakers=2,
-                 modals=['a','v','l'],
                  use_speaker=True,
                  num_graph_layers=4,
                  original_gcn=False,
@@ -25,7 +24,6 @@ class GCN(nn.Module):
         
         
         self.dropout = dropout
-        self.modals = modals
         self.modal_embeddings = nn.Embedding(3, n_dim)
         self.speaker_embeddings = nn.Embedding(n_speakers, n_dim)
         self.use_speaker = use_speaker
@@ -36,7 +34,7 @@ class GCN(nn.Module):
         for kk in range(self.num_graph_layers):
             setattr(self,'conv%d' %(kk+1), GraphGCN(nhidden, nhidden,  graph_masking=self.graph_masking))
 
-    def forward(self, a, v, l, dia_len, qmask, epoch):
+    def forward(self, a, v, l, dia_len, qmask):
         qmask = torch.cat([qmask[:x,i,:] for i,x in enumerate(dia_len)],dim=0)
         spk_idx = torch.argmax(qmask, dim=-1)
         spk_emb_vector = self.speaker_embeddings(spk_idx)
@@ -51,7 +49,7 @@ class GCN(nn.Module):
            
         
         
-        gnn_edge_index, gnn_features = self.create_gnn_index(a, v, l, dia_len, self.modals)
+        gnn_edge_index, gnn_features = self.create_gnn_index(a, v, l, dia_len)
         x1 = self.fc1(gnn_features)  
         out = x1
         gnn_out = x1
@@ -84,8 +82,8 @@ class GCN(nn.Module):
         return features
 
 
-    def create_gnn_index(self, a, v, l, dia_len, modals):
-        num_modality = len(modals)
+    def create_gnn_index(self, a, v, l, dia_len):
+        num_modality = 3
         node_count = 0
         index =[]
         tmp = []
@@ -105,7 +103,7 @@ class GCN(nn.Module):
             for _ in range(i):
                 Gnodes.append([nodes_l[_]] + [nodes_a[_]] + [nodes_v[_]])
                 
-            for ii, _ in enumerate(Gnodes):
+            for _, _ in enumerate(Gnodes):
                 tmp = tmp +  list(permutations(_,2))
                 
             if node_count == 0:
