@@ -135,7 +135,6 @@ class Model(nn.Module):
                  av_using_lstm=False,
                  dataset='IEMOCAP',
                  use_speaker=True,
-                 use_modal=False,
                  num_L = 3,
                  num_K = 4,
                  modality_self_attention=False, 
@@ -159,7 +158,6 @@ class Model(nn.Module):
         self.return_feature = True
         self.modals = [x for x in modals]  # a, v, l
         self.use_speaker = use_speaker
-        self.use_modal = use_modal
         self.att_type = att_type
         self.normBNa = nn.BatchNorm1d(1024, affine=True)
         self.normBNb = nn.BatchNorm1d(1024, affine=True)
@@ -200,9 +198,7 @@ class Model(nn.Module):
                     self.linear_l = nn.Linear(D_m, hidden_l)
                     self.lstm_l = nn.LSTM(input_size=hidden_l, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
 
-        else:
-            print ('Base model must be one of DialogRNN/LSTM/GRU')
-            raise NotImplementedError
+       
         if self.modality_self_attention:
             
             self.a_align = MultiHeadCrossModalAttention(D_g, D_g, D_g, 2) 
@@ -213,41 +209,31 @@ class Model(nn.Module):
             self.align = MultiHeadCrossModalAttention(D_g, D_g, D_g, 2) 
 
         self.graph_model = GCN(n_dim=D_g, nhidden=graph_hidden_size, 
-                                        dropout=self.dropout, lamda=0.5, alpha=0.1, variant=True, return_feature=self.return_feature, use_residue=self.use_residue, n_speakers=n_speakers, modals=self.modals, use_speaker=self.use_speaker, use_modal=self.use_modal, num_L=num_L, num_K=num_K, original_gcn=self.original_gcn, graph_masking=self.graph_masking)
+                                        dropout=self.dropout, lamda=0.5, alpha=0.1, variant=True, return_feature=self.return_feature, use_residue=self.use_residue, n_speakers=n_speakers, modals=self.modals, use_speaker=self.use_speaker,  num_L=num_L, num_K=num_K, original_gcn=self.original_gcn, graph_masking=self.graph_masking)
         print("construct "+self.graph_type)
 
         if self.multi_modal:
             self.dropout_ = nn.Dropout(self.dropout)
             self.hidfc = nn.Linear(graph_hidden_size, n_classes)
-            if self.att_type == 'concat_subsequently':
-                if self.use_residue:
-                    self.smax_fc = nn.Linear((D_g+graph_hidden_size)*len(self.modals), n_classes)
-                else:
-                    self.smax_fc = nn.Linear((graph_hidden_size)*len(self.modals), n_classes)
-            elif self.att_type == 'concat_DHT':
+          
+            if self.att_type == 'concat_DHT':
                 if self.use_residue:
                     self.smax_fc = nn.Linear((D_g+graph_hidden_size*2)*len(self.modals), n_classes)
                 else:
                     self.smax_fc = nn.Linear((graph_hidden_size*2)*len(self.modals), n_classes)
-            elif self.att_type == 'gated':
-                if len(self.modals) == 3:
-                    self.smax_fc = nn.Linear(100*len(self.modals), graph_hidden_size)
-                else:
-                    self.smax_fc = nn.Linear(100, graph_hidden_size)
-            else:
-                self.smax_fc = nn.Linear(D_g+graph_hidden_size*len(self.modals), graph_hidden_size)
+          
 
 
-    def _reverse_seq(self, X, mask):
-        X_ = X.transpose(0,1)
-        mask_sum = torch.sum(mask, 1).int()
+    # def _reverse_seq(self, X, mask):
+    #     X_ = X.transpose(0,1)
+    #     mask_sum = torch.sum(mask, 1).int()
 
-        xfs = []
-        for x, c in zip(X_, mask_sum):
-            xf = torch.flip(x[:c], [0])
-            xfs.append(xf)
+    #     xfs = []
+    #     for x, c in zip(X_, mask_sum):
+    #         xf = torch.flip(x[:c], [0])
+    #         xfs.append(xf)
 
-        return pad_sequence(xfs)
+    #     return pad_sequence(xfs)
 
 
     def forward(self, U, qmask, umask, seq_lengths, U_a=None, U_v=None, epoch=None):
@@ -262,9 +248,7 @@ class Model(nn.Module):
         r4 = self.normBNd(r4.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
 
         U = (r1 + r2 + r3 + r4)/4
-        #U = torch.cat((textf,acouf),dim=-1)
-        #=============roberta features
-        # print(self.multi_modal)
+       
         if self.base_model == 'LSTM':
             if not self.multi_modal:
                 if self.modals == "l":

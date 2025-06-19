@@ -20,7 +20,7 @@ from graphgcn import GraphGCN
 
 class GCN(nn.Module):
     def __init__(self, n_dim, nhidden, dropout, lamda, alpha, variant, return_feature, use_residue, 
-                new_graph='full',n_speakers=2, modals=['a','v','l'], use_speaker=True, use_modal=False, num_L=3, num_K=4, original_gcn=False, graph_masking=True):
+                new_graph='full',n_speakers=2, modals=['a','v','l'], use_speaker=True,  num_L=3, num_K=4, original_gcn=False, graph_masking=True):
         super(GCN, self).__init__()
         self.return_feature = return_feature  #True
         self.use_residue = use_residue
@@ -37,8 +37,6 @@ class GCN(nn.Module):
         self.modal_embeddings = nn.Embedding(3, n_dim)
         self.speaker_embeddings = nn.Embedding(n_speakers, n_dim)
         self.use_speaker = use_speaker
-        self.use_modal = use_modal
-        self.use_position = False
         #------------------------------------    
         self.fc1 = nn.Linear(n_dim, nhidden)         
         self.num_L =  num_L
@@ -49,7 +47,7 @@ class GCN(nn.Module):
         self.hyperedge_attr1 = nn.Parameter(torch.rand(nhidden))
         self.hyperedge_attr2 = nn.Parameter(torch.rand(nhidden))
         for kk in range(num_K):
-            setattr(self,'conv%d' %(kk+1), GraphGCN(nhidden, nhidden, original_gcn = self.original_gcn, graph_masking=self.graph_masking))
+            setattr(self,'conv%d' %(kk+1), GraphGCN(nhidden, nhidden,  graph_masking=self.graph_masking))
 
     def forward(self, a, v, l, dia_len, qmask, epoch):
         qmask = torch.cat([qmask[:x,i,:] for i,x in enumerate(dia_len)],dim=0)
@@ -58,26 +56,12 @@ class GCN(nn.Module):
         if self.use_speaker:
             if 'l' in self.modals:
                 l += spk_emb_vector
-        if self.use_position:
-            if 'l' in self.modals:
-                l = self.l_pos(l, dia_len)
-            if 'a' in self.modals:
-                a = self.a_pos(a, dia_len)
-            if 'v' in self.modals:
-                v = self.v_pos(v, dia_len)
-        if self.use_modal:  
-            emb_idx = torch.LongTensor([0, 1, 2]).to("cuda:3")
-            emb_vector = self.modal_embeddings(emb_idx)
-
-            if 'a' in self.modals:
-                a += emb_vector[0].reshape(1, -1).expand(a.shape[0], a.shape[1])
-            if 'v' in self.modals:
-                v += emb_vector[1].reshape(1, -1).expand(v.shape[0], v.shape[1])
-            if 'l' in self.modals:
-                l += emb_vector[2].reshape(1, -1).expand(l.shape[0], l.shape[1])                                  
-
-        #---------------------------------------
-        
+            if "a" in self.modals:
+                a += spk_emb_vector
+            if "v" in self.modals:
+                v += spk_emb_vector
+      
+           
         
         
         gnn_edge_index, gnn_features = self.create_gnn_index(a, v, l, dia_len, self.modals)
