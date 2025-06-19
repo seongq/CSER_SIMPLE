@@ -15,7 +15,6 @@ class GCN(nn.Module):
                  n_speakers=2,
                  modals=['a','v','l'],
                  use_speaker=True,
-                 num_L=3,
                  num_K=4,
                  original_gcn=False,
                  graph_masking=True):
@@ -36,7 +35,6 @@ class GCN(nn.Module):
         self.use_speaker = use_speaker
         #------------------------------------    
         self.fc1 = nn.Linear(n_dim, nhidden)         
-        self.num_L =  num_L
         self.num_K =  num_K
         
         for kk in range(num_K):
@@ -46,14 +44,14 @@ class GCN(nn.Module):
         qmask = torch.cat([qmask[:x,i,:] for i,x in enumerate(dia_len)],dim=0)
         spk_idx = torch.argmax(qmask, dim=-1)
         spk_emb_vector = self.speaker_embeddings(spk_idx)
-        if self.use_speaker:
-            if 'l' in self.modals:
-                l += spk_emb_vector
-            if "a" in self.modals:
-                a += spk_emb_vector
-            if "v" in self.modals:
-                v += spk_emb_vector
-      
+        
+        
+        l += spk_emb_vector
+
+        a += spk_emb_vector
+
+        v += spk_emb_vector
+
            
         
         

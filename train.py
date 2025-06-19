@@ -123,13 +123,13 @@ def train_or_eval_graph_model(model, loss_function, dataloader, epoch, cuda, mod
                 textf = textf
             else:
                 raise NotImplementedError
-
+        
         lengths = [(umask[j] == 1).nonzero(as_tuple=False).tolist()[-1][0] + 1 for j in range(len(umask))]
 
-        if args.multi_modal and args.mm_fusion_mthd=='concat_DHT':   
-            log_prob = model([textf1,textf2,textf3,textf4], qmask, umask, lengths, acouf, visuf, epoch)
-        else:
-            log_prob = model(textf, qmask, umask, lengths)
+    
+        log_prob = model([textf1,textf2,textf3,textf4], qmask, lengths, acouf, visuf, epoch)
+    
+    
         label = torch.cat([label[j][:lengths[j]] for j in range(len(label))])
         loss = loss_function(log_prob, label)
         preds.append(torch.argmax(log_prob, 1).cpu().numpy())
@@ -178,11 +178,8 @@ if __name__ == '__main__':
     parser.add_argument('--mm_fusion_mthd', default='concat_DHT', help='method to use multimodal information: concat, gated, concat_subsequently')
     parser.add_argument('--modals', default='avl', help='modals to fusion')
     parser.add_argument('--Dataset', default='IEMOCAP', help='dataset to train and test', choices = ("IEMOCAP", "MELD"))
-    parser.add_argument('--num_L', type=int, default=3, help='num_hyperconvs')
     parser.add_argument('--num_K', type=int, default=4, help='num_convs')
     parser.add_argument("--seed_number", type=int, default=1, required=True)
-    parser.add_argument("--self_attention", action="store_true", default=False)
-    parser.add_argument("--original_gcn", default=False, action="store_true")
     parser.add_argument("--graph_masking", default=True, action="store_false")
     args = parser.parse_args()
     
@@ -260,7 +257,6 @@ if __name__ == '__main__':
                   modals=args.modals,
                   att_type=args.mm_fusion_mthd,
                   dataset=args.Dataset,
-                  num_L = args.num_L,
                   num_K = args.num_K,
                   graph_masking=args.graph_masking)
 
@@ -307,15 +303,10 @@ if __name__ == '__main__':
 
 
 
-    model_save_dir = os.path.join("./save_folder", args.Dataset, f"original__self_attention_{args.self_attention}_graphmasking_{args.graph_masking}_originalgcn_{args.original_gcn}")
+    model_save_dir = os.path.join("./save_folder", args.Dataset, f"original___graphmasking_{args.graph_masking}")
     os.makedirs(model_save_dir, exist_ok=True)
     
     
-    
-    # kst = pytz.timezone("Asia/Seoul")
-    # now_kst = datetime.now(kst)
-    # timestamp_str = now_kst.strftime("%Y%m%d%H%M")
-    # print(timestamp_str)
     pickle_path = os.path.join(f"./result/{args.Dataset}", "result.pkl")
     
     temporary_pickle_dir_path = os.path.dirname(pickle_path)
@@ -366,7 +357,7 @@ if __name__ == '__main__':
         for i in range(len(class_f1)):
             result_dictionary[f"f1_{i}"] = class_f1[i]
 
-        mode_str = f"ORIGINAL__attention_{args.self_attention}_graph_masking_{args.graph_masking}"
+        mode_str = f"ORIGINAL__graph_masking_{args.graph_masking}"
         result_dictionary["mode"] = mode_str
 
         # 모델 파일 이름

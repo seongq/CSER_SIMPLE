@@ -1,10 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
-from torch.nn.utils.rnn import pad_sequence
-import numpy as np, itertools, random, copy, math
-from model_gcn import GCN, UNIMODALGCN
+from model_gcn import GCN
 
 def print_grad(grad):
     print('the grad is', grad[2][0:5])
@@ -186,19 +183,26 @@ class Model(nn.Module):
  
         self.align = MultiHeadCrossModalAttention(D_g, D_g, D_g, 2) 
 
-        self.graph_model = GCN(n_dim=D_g, nhidden=graph_hidden_size, 
-                                        dropout=self.dropout, lamda=0.5, alpha=0.1, variant=True, return_feature=self.return_feature,  n_speakers=n_speakers, modals=self.modals, num_L=num_L, num_K=num_K, original_gcn=self.original_gcn, graph_masking=self.graph_masking)
+        self.graph_model = GCN(n_dim=D_g, 
+                               nhidden=graph_hidden_size,
+                               dropout=self.dropout,
+                               lamda=0.5,
+                               alpha=0.1,
+                               
+                               return_feature=self.return_feature,
+                               n_speakers=n_speakers, 
+                               modals=self.modals,
+                               num_K=num_K,
+                               original_gcn=self.original_gcn,
+                               graph_masking=self.graph_masking)
 
         
         self.dropout_ = nn.Dropout(self.dropout)
-        self.hidfc = nn.Linear(graph_hidden_size, n_classes)
-        
-        
         self.smax_fc = nn.Linear((graph_hidden_size*2)*len(self.modals), n_classes)
         
 
 
-    def forward(self, U, qmask, umask, seq_lengths, U_a=None, U_v=None, epoch=None):
+    def forward(self, U, qmask, seq_lengths, U_a=None, U_v=None, epoch=None):
 
         #=============roberta features
         [r1,r2,r3,r4]=U
