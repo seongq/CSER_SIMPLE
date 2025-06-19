@@ -268,14 +268,49 @@ if __name__ == '__main__':
     os.makedirs(model_save_dir, exist_ok=True)
     
     
-    csv_path = os.path.join(f"./save_folder/main_name", "results.csv")
+    csv_path = os.path.join(f"./save_folder/{main_name}", "results.csv")
     
     temporary_csv_dir_path = os.path.dirname(csv_path)
     os.makedirs(temporary_csv_dir_path, exist_ok=True)
     
     
+    import csv
+    
+    if not os.path.isfile(csv_path):
+        with open(csv_path, mode="w", newline='') as f:
+            writer = csv.writer(f)
+            COLUMNS = []
+            COLUMNS.append('epoch')
+            
+            COLUMNS.append('spk_embs')
+            COLUMNS.append("using_lstms")
+            COLUMNS.append("aligns")
+            COLUMNS.append("Dataset")
+            COLUMNS.append("seed_number")
+            COLUMNS.append("timestamp_str")
+            COLUMNS.append("model_path")
+            
+            COLUMNS.append("train_loss")
+            COLUMNS.append("train_acc")
+            COLUMNS.append("train_fscore")
+            COLUMNS.append("test_loss")
+            COLUMNS.append("test_acc")
+            COLUMNS.append("test_fscore")
+            
+            COLUMNS.append("ACC")
+            for i in range(n_classes):
+                COLUMNS.append(f'ACC_{i}')
+                
+            COLUMNS.append("F1")
+            for i in range(n_classes):
+                COLUMNS.append(f"F1_{i}")
+                
+            writer.writerow(COLUMNS)
+    
     for e in range(n_epochs):
-        print(f"epoch: {e}")
+        epoch = str(e).zfill(3)
+        print(f"epoch: {epoch} ")
+
         start_time = time.time()
 
         train_loss, train_acc, _, _, train_fscore, _ = train_or_eval_graph_model(model,  
@@ -300,21 +335,25 @@ if __name__ == '__main__':
                                                                                                e,
                                                                                                cuda
                                                                                                )
-        # all_fscore.append(test_fscore)
-        # all_acc.append(test_acc)
-
-      
+          
             
         f1_metrics = compute_detailed_metrics(test_label, test_pred, sample_weight=None)
-        wf1 = f1_score(test_label, test_pred, sample_weight=None, average='weighted')
-        acc = accuracy_score(test_label, test_pred)
         class_accuracy = f1_metrics["class_accuracy"]
+        
         class_f1 = f1_metrics["class_f1"]
+        
+        
+       
         weighted_accuracy = f1_metrics['weighted_accuracy']
         weighted_f1 = f1_metrics['weighted_f1']
 
+        filename = f"epoch_{epoch}_f1_{test_fscore:.2f}_acc_{test_acc:.2f}__seed_{seed_number}.pth"
+        model_path = os.path.join(model_save_dir, filename)
+        
+        
+        
         result_dictionary = {
-            'epoch': e,
+            'epoch': epoch,
             'f1_w': weighted_f1,
             'acc_w': weighted_accuracy,
             'train_loss': train_loss,
@@ -326,17 +365,7 @@ if __name__ == '__main__':
             'seed': seed_number
         }
 
-        for i in range(len(class_accuracy)):
-            result_dictionary[f"acc_{i}"] = class_accuracy[i]
-        for i in range(len(class_f1)):
-            result_dictionary[f"f1_{i}"] = class_f1[i]
-
-        mode_str = f"ORIGINAL__graph_masking_{args.graph_masking}"
-        result_dictionary["mode"] = mode_str
-
-        # 모델 파일 이름
-        filename = f"model_f1_{test_fscore:.2f}_acc_{acc*100:.2f}_epoch_{e}_seed_{seed_number}.pth"
-        model_path = os.path.join(model_save_dir, filename)
+        
         result_dictionary['path'] = model_path
 
         # 모델 저장
@@ -347,18 +376,7 @@ if __name__ == '__main__':
             "seed": seed_number,
         }, model_path)
 
-        # # 결과 누적 저장
-        # if os.path.exists(pickle_path):
-        #     with open(pickle_path, "rb") as f:
-        #         tempdata = pickle.load(f)
-        #     for key in result_dictionary:
-        #         tempdata.setdefault(key, []).append(result_dictionary[key])
-        # else:
-        #     tempdata = {key: [val] for key, val in result_dictionary.items()}
-
-        # with open(pickle_path, "wb") as f:
-        #     pickle.dump(tempdata, f)
-            
+       
         elapsed_time = round(time.time() - start_time, 2)
 
         print(f"[Epoch {e+1:03d}]")

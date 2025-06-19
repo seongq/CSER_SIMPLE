@@ -23,7 +23,7 @@ def compute_detailed_metrics(labels, preds, sample_weight=None):
     class_acc = (cm.diagonal() / cm.sum(axis=1) * 100 ).tolist()
     # print(class_acc)
     # class-wise F1
-    class_f1 = [report[str(i)]['f1-score'] for i in range(len(class_acc))]
+    class_f1 = [report[str(i)]['f1-score'] * 100 for i in range(len(class_acc))]
 
     # weighted average accuracy = accuracy_score with sample_weight
     weighted_accuracy = accuracy_score(labels, preds, sample_weight=sample_weight) * 100
