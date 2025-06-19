@@ -124,9 +124,8 @@ class Model(nn.Module):
                  alpha=0.2, 
                  D_m_v=512,
                  D_m_a=100,
-                 modals='avl',
                  dataset='IEMOCAP',
-                 num_K = 4,
+                 num_graph_layers = 4,
                  original_gcn=False,
                  graph_masking=True):
         
@@ -144,25 +143,22 @@ class Model(nn.Module):
         
         
         self.return_feature = True
-        self.modals = [x for x in modals]  # a, v, l
+        
+        
+        
         self.normBNa = nn.BatchNorm1d(1024, affine=True)
         self.normBNb = nn.BatchNorm1d(1024, affine=True)
         self.normBNc = nn.BatchNorm1d(1024, affine=True)
         self.normBNd = nn.BatchNorm1d(1024, affine=True)
 
     
-        self.multi_modal = True
        
         self.dataset = dataset
-
-       
-    
+   
         
         hidden_a = D_g
         hidden_v = D_g
         hidden_t = D_g
-
-
 
         self.linear_a = nn.Linear(D_m_a, hidden_a)
         self.lstm_a = nn.LSTM(input_size=hidden_a, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
@@ -186,14 +182,12 @@ class Model(nn.Module):
                                
                                return_feature=self.return_feature,
                                n_speakers=n_speakers, 
-                               modals=self.modals,
                                num_K=num_K,
-                               original_gcn=self.original_gcn,
                                graph_masking=self.graph_masking)
 
         
         self.dropout_ = nn.Dropout(self.dropout)
-        self.smax_fc = nn.Linear((graph_hidden_size*2)*len(self.modals), n_classes)
+        self.smax_fc = nn.Linear((graph_hidden_size*2)*3, n_classes)
         
 
 

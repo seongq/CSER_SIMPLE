@@ -254,8 +254,6 @@ if __name__ == '__main__':
                   alpha=args.alpha,
                   D_m_v = D_visual,
                   D_m_a = D_audio,
-                  modals=args.modals,
-                  att_type=args.mm_fusion_mthd,
                   dataset=args.Dataset,
                   num_K = args.num_K,
                   graph_masking=args.graph_masking)
