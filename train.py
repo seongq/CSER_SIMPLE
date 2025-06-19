@@ -159,20 +159,23 @@ if __name__ == '__main__':
     parser.add_argument('--num_graph_layers', type=int, default=4, help='num of GNN layers')
     parser.add_argument("--seed_number", type=int, default=1, required=True)
     parser.add_argument("--graph_masking", default=True, action="store_false")
+    
+    parser.add_argument("--spk_embs", default='avt', choices= ('a', 'v', 't', 'av', 'at', 'vt', 'avt'))
+    parser.add_argument("--using_lstms", default="avt", choices= ('a', 'v', 't', 'av', 'at', 'vt', 'avt'))
+    parser.add_argument("--aligns", default="to_t", choices= ("to_a", "to_v", "to_t"))
     args = parser.parse_args()
     
     
     kst = pytz.timezone("Asia/Seoul")
     now_kst = datetime.now(kst)
     timestamp_str = now_kst.strftime("%Y%m%d%H%M")
-    print(timestamp_str)    
     print(args)
     
-    name_ = '_'+'_'+args.Dataset
+    main_name = "spk_embs_"+args.spk_embs+"_"+"using_lstms_"+args.using_lstms+"_"+"aligns_"+args.aligns+"_datasets_"+args.Dataset+"_"+"seed_"+str(args.seed_number)+f"_{timestamp_str}"
     
         
         
-    print(name_)
+    print(main_name)
 
     
     
@@ -259,8 +262,6 @@ if __name__ == '__main__':
     else:
         print("There is no such dataset")
 
-    best_fscore, best_acc, best_loss, best_label_f1, best_label_acc, best_pred_f1, best_pred_acc , best_mask = -1000, -1000, None, None, None, None, None, None
-    all_fscore, all_acc, all_loss = [], [], []
 
 
 
@@ -302,14 +303,13 @@ if __name__ == '__main__':
                                                                                                e,
                                                                                                cuda
                                                                                                )
-        all_fscore.append(test_fscore)
-        all_acc.append(test_acc)
+        # all_fscore.append(test_fscore)
+        # all_acc.append(test_acc)
 
       
             
-        best_mask = None
-        f1_metrics = compute_detailed_metrics(test_label, test_pred, sample_weight=best_mask)
-        wf1 = f1_score(test_label, test_pred, sample_weight=best_mask, average='weighted')
+        f1_metrics = compute_detailed_metrics(test_label, test_pred, sample_weight=None)
+        wf1 = f1_score(test_label, test_pred, sample_weight=None, average='weighted')
         acc = accuracy_score(test_label, test_pred)
         class_accuracy = f1_metrics["class_accuracy"]
         class_f1 = f1_metrics["class_f1"]
@@ -350,17 +350,17 @@ if __name__ == '__main__':
             "seed": seed_number,
         }, model_path)
 
-        # 결과 누적 저장
-        if os.path.exists(pickle_path):
-            with open(pickle_path, "rb") as f:
-                tempdata = pickle.load(f)
-            for key in result_dictionary:
-                tempdata.setdefault(key, []).append(result_dictionary[key])
-        else:
-            tempdata = {key: [val] for key, val in result_dictionary.items()}
+        # # 결과 누적 저장
+        # if os.path.exists(pickle_path):
+        #     with open(pickle_path, "rb") as f:
+        #         tempdata = pickle.load(f)
+        #     for key in result_dictionary:
+        #         tempdata.setdefault(key, []).append(result_dictionary[key])
+        # else:
+        #     tempdata = {key: [val] for key, val in result_dictionary.items()}
 
-        with open(pickle_path, "wb") as f:
-            pickle.dump(tempdata, f)
+        # with open(pickle_path, "wb") as f:
+        #     pickle.dump(tempdata, f)
             
         elapsed_time = round(time.time() - start_time, 2)
 
