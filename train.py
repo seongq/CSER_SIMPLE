@@ -155,12 +155,7 @@ if __name__ == '__main__':
     parser.add_argument('--dropout', type=float, default=0.5, metavar='dropout', help='dropout rate')
     parser.add_argument('--batch_size', type=int, default=16, metavar='BS', help='batch size')
     parser.add_argument('--epochs', type=int, default=300, metavar='E', help='number of epochs')
-    parser.add_argument('--alpha', type=float, default=0.2, help='alpha')
 
-    parser.add_argument('--use_residue', action='store_true', default=False, help='whether to use residue information or not')
-    parser.add_argument('--multi_modal', action='store_true', default=True, help='whether to use multimodal information')
-    parser.add_argument('--mm_fusion_mthd', default='concat_DHT', help='method to use multimodal information: concat, gated, concat_subsequently')
-    parser.add_argument('--modals', default='avl', help='modals to fusion')
     parser.add_argument('--Dataset', default='IEMOCAP', help='dataset to train and test', choices = ("IEMOCAP", "MELD"))
     parser.add_argument('--num_graph_layers', type=int, default=4, help='num of GNN layers')
     parser.add_argument("--seed_number", type=int, default=1, required=True)
@@ -174,7 +169,7 @@ if __name__ == '__main__':
     print(timestamp_str)    
     print(args)
     
-    name_ = '_'+args.modals+'_'+'_'+args.Dataset
+    name_ = '_'+'_'+args.Dataset
     
         
         
@@ -195,7 +190,6 @@ if __name__ == '__main__':
     cuda       = args.cuda
     n_epochs   = args.epochs
     batch_size = args.batch_size
-    modals = args.modals
     seed_number = args.seed_number
     # feature dimension
     feat2dim = {'IS10':1582,'3DCNN':512,'textCNN':100,'bert':768,'denseface':342,'MELD_text':600,'MELD_audio':300}
@@ -225,7 +219,6 @@ if __name__ == '__main__':
                   n_speakers=n_speakers,
                   n_classes=n_classes,
                   dropout=args.dropout,
-                  alpha=args.alpha,
                   D_m_v = D_visual,
                   D_m_a = D_audio,
                   dataset=args.Dataset,

@@ -122,7 +122,6 @@ class Model(nn.Module):
                  dropout=0.5,  
                  D_m_v=512,
                  D_m_a=100,
-                 dataset='IEMOCAP',
                  num_graph_layers = 4,
                  graph_masking=True):
         
@@ -147,7 +146,6 @@ class Model(nn.Module):
 
     
        
-        self.dataset = dataset
    
         
         hidden_a = D_g
