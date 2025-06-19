@@ -9,8 +9,6 @@ class GCN(nn.Module):
                  n_dim, 
                  nhidden,
                  dropout,
-                 lamda,
-                 alpha,
                  return_feature,
                  n_speakers=2,
                  modals=['a','v','l'],
@@ -27,8 +25,6 @@ class GCN(nn.Module):
         
         
         self.dropout = dropout
-        self.alpha = alpha
-        self.lamda = lamda
         self.modals = modals
         self.modal_embeddings = nn.Embedding(3, n_dim)
         self.speaker_embeddings = nn.Embedding(n_speakers, n_dim)

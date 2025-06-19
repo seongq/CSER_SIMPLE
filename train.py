@@ -155,8 +155,6 @@ if __name__ == '__main__':
     parser.add_argument('--dropout', type=float, default=0.5, metavar='dropout', help='dropout rate')
     parser.add_argument('--batch_size', type=int, default=16, metavar='BS', help='batch size')
     parser.add_argument('--epochs', type=int, default=300, metavar='E', help='number of epochs')
-    parser.add_argument('--graph_type', default='hyper', help='hyper/relation/GCN3/DeepGCN/MMGCN/MMGCN2')
-    parser.add_argument('--use_topic', action='store_true', default=False, help='whether to use topic information')
     parser.add_argument('--alpha', type=float, default=0.2, help='alpha')
 
     parser.add_argument('--use_residue', action='store_true', default=False, help='whether to use residue information or not')
@@ -176,7 +174,7 @@ if __name__ == '__main__':
     print(timestamp_str)    
     print(args)
     
-    name_ = '_'+args.modals+'_'+args.graph_type+'_'+args.Dataset
+    name_ = '_'+args.modals+'_'+'_'+args.Dataset
     
         
         

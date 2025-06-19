@@ -120,12 +120,10 @@ class Model(nn.Module):
                  n_speakers,
                  n_classes=7, 
                  dropout=0.5,  
-                 alpha=0.2, 
                  D_m_v=512,
                  D_m_a=100,
                  dataset='IEMOCAP',
                  num_graph_layers = 4,
-                 original_gcn=False,
                  graph_masking=True):
         
         super(Model, self).__init__()
@@ -134,7 +132,6 @@ class Model(nn.Module):
        
        
         
-        self.alpha = alpha
        
         self.dropout = dropout
         
@@ -158,15 +155,15 @@ class Model(nn.Module):
         hidden_t = D_g
 
         self.linear_a = nn.Linear(D_m_a, hidden_a)
-        self.lstm_a = nn.LSTM(input_size=hidden_a, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
+        self.lstm_a = nn.LSTM(input_size=hidden_a, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=self.dropout)
     
         
         self.linear_v = nn.Linear(D_m_v, hidden_v)
-        self.lstm_v = nn.LSTM(input_size=hidden_v, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
+        self.lstm_v = nn.LSTM(input_size=hidden_v, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=self.dropout)
     
         
         self.linear_t = nn.Linear(D_m, hidden_t)
-        self.lstm_t = nn.LSTM(input_size=hidden_t, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
+        self.lstm_t = nn.LSTM(input_size=hidden_t, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=self.dropout)
 
  
         self.align = MultiHeadCrossModalAttention(D_g, D_g, D_g, 2) 
@@ -174,9 +171,6 @@ class Model(nn.Module):
         self.graph_model = GCN(n_dim=D_g, 
                                nhidden=graph_hidden_size,
                                dropout=self.dropout,
-                               lamda=0.5,
-                               alpha=0.1,
-                               
                                return_feature=self.return_feature,
                                n_speakers=n_speakers, 
                                num_graph_layers=num_graph_layers,
