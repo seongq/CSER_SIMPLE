@@ -1,35 +1,32 @@
 import torch 
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
-from torch.nn.utils.rnn import pad_sequence
-from torch_geometric.nn import RGCNConv, GraphConv, FAConv
-from torch.nn import Parameter
-import numpy as np, itertools, random, copy, math
-import math
-import scipy.sparse as sp
-# import ipdb
-# from HypergraphConv import HypergraphConv
-from torch_geometric.nn import GCNConv
 from itertools import permutations
-from torch_geometric.nn import global_mean_pool as gap, global_max_pool as gmp, global_add_pool as gsp
-from torch_geometric.nn.inits import glorot
-from torch_geometric.utils import add_self_loops
 from graphgcn import GraphGCN
 
 
 class GCN(nn.Module):
-    def __init__(self, n_dim, nhidden, dropout, lamda, alpha, variant, return_feature, use_residue, 
-                new_graph='full',n_speakers=2, modals=['a','v','l'], use_speaker=True,  num_L=3, num_K=4, original_gcn=False, graph_masking=True):
+    def __init__(self, 
+                 n_dim, 
+                 nhidden,
+                 dropout,
+                 lamda,
+                 alpha,
+                 return_feature,
+                 n_speakers=2,
+                 modals=['a','v','l'],
+                 use_speaker=True,
+                 num_L=3,
+                 num_K=4,
+                 original_gcn=False,
+                 graph_masking=True):
         super(GCN, self).__init__()
         self.return_feature = return_feature  #True
-        self.use_residue = use_residue
-        self.new_graph = new_graph
+        
 
         self.original_gcn = original_gcn
         self.graph_masking = graph_masking
         
-        self.act_fn = nn.ReLU()
+        
         self.dropout = dropout
         self.alpha = alpha
         self.lamda = lamda
@@ -41,11 +38,7 @@ class GCN(nn.Module):
         self.fc1 = nn.Linear(n_dim, nhidden)         
         self.num_L =  num_L
         self.num_K =  num_K
-        self.act_fn = nn.ReLU()
-        self.hyperedge_weight = nn.Parameter(torch.ones(1000))
-        self.EW_weight = nn.Parameter(torch.ones(5200))
-        self.hyperedge_attr1 = nn.Parameter(torch.rand(nhidden))
-        self.hyperedge_attr2 = nn.Parameter(torch.rand(nhidden))
+        
         for kk in range(num_K):
             setattr(self,'conv%d' %(kk+1), GraphGCN(nhidden, nhidden,  graph_masking=self.graph_masking))
 
@@ -69,16 +62,13 @@ class GCN(nn.Module):
         out = x1
         gnn_out = x1
         for kk in range(self.num_K):
-            if self.original_gcn:
-                gnn_out = getattr(self,'conv%d' %(kk+1))(gnn_out,gnn_edge_index)
-            else:
-                gnn_out = gnn_out + getattr(self,'conv%d' %(kk+1))(gnn_out,gnn_edge_index)
+            gnn_out = gnn_out + getattr(self,'conv%d' %(kk+1))(gnn_out,gnn_edge_index)
 
         out2 = torch.cat([out,gnn_out], dim=1)
-        if self.use_residue:
-            out2 = torch.cat([gnn_features, out2], dim=-1)
+        
+        
         out1 = self.reverse_features(dia_len, out2)
-        #---------------------------------------
+        
         return out1
 
     def reverse_features(self, dia_len, features):
@@ -146,82 +136,3 @@ class GCN(nn.Module):
     
     
     
-class UNIMODALGCN(nn.Module):
-    def __init__(self, n_dim, nhidden, dropout, lamda, alpha, return_feature, use_residue, 
-                new_graph='full',n_speakers=2, modality=None, use_speaker=True, use_modal=False, num_L=3, num_K=4):
-        super(UNIMODALGCN, self).__init__()
-        self.return_feature = return_feature  #True
-        self.use_residue = use_residue
-        self.new_graph = new_graph
-
-        self.modality = modality
-        self.speaker_embeddings = nn.Embedding(n_speakers, n_dim)
-        self.use_speaker = use_speaker
-        # self.use_position = False
-        #------------------------------------    
-        self.fc1 = nn.Linear(n_dim, nhidden)         
-        self.num_K =  num_K
-
-        for kk in range(num_K):
-            setattr(self,'conv%d' %(kk+1), GraphGCN(nhidden, nhidden))
-
-    def forward(self,uni_feature, dia_len, qmask, epoch):
-        qmask = torch.cat([qmask[:x,i,:] for i,x in enumerate(dia_len)],dim=0)
-        spk_idx = torch.argmax(qmask, dim=-1)
-        spk_emb_vector = self.speaker_embeddings(spk_idx)
-        if self.use_speaker:
-            if self.modality == "text":
-                uni_feature += spk_emb_vector
-            
-        
-        
-        gnn_edge_index, gnn_features = self.create_gnn_index(uni_feature, dia_len)
-        x1 = self.fc1(gnn_features)  
-        out = x1
-        gnn_out = x1
-        for kk in range(self.num_K):
-            gnn_out = gnn_out + getattr(self,'conv%d' %(kk+1))(gnn_out,gnn_edge_index)
-
-        out2 = torch.cat([out,gnn_out], dim=1)
-        if self.use_residue:
-            out2 = torch.cat([gnn_features, out2], dim=-1)
-        out1 = self.reverse_features(dia_len, out2)
-        #---------------------------------------
-        return out1
-
-    def reverse_features(self, dia_len, features):
-        tmplist = []
-        
-        for i in dia_len:
-            tmpfeatures = features[0:1*i]
-            features = features[1*i:]
-            tmplist.append(tmpfeatures)
-        features = torch.cat(tmplist,dim=0)
-        return features
-
-
-    def create_gnn_index(self, uni_feature, dia_len):
-        # num_modality = len(modals)
-        node_count = 0
-        index =[]
-        tmp = []
-        
-        
-        for i in dia_len:
-            nodes = list(range(i))
-            
-            nodes = [j + node_count for j in nodes] 
-            
-            index = index + list(permutations(nodes,2)) 
-            
-            if node_count == 0:
-                features = uni_feature[0:0+i]
-                temp = 0+i
-            else:
-                features_temp = uni_feature[temp:temp+i]                
-                features =  torch.cat([features,features_temp],dim=0)
-                temp = temp+i
-            node_count = node_count + i
-        edge_index = torch.LongTensor(index).T.to("cuda:0")
-        
-        return edge_index, features

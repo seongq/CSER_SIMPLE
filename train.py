@@ -177,7 +177,6 @@ if __name__ == '__main__':
     parser.add_argument('--multi_modal', action='store_true', default=True, help='whether to use multimodal information')
     parser.add_argument('--mm_fusion_mthd', default='concat_DHT', help='method to use multimodal information: concat, gated, concat_subsequently')
     parser.add_argument('--modals', default='avl', help='modals to fusion')
-    parser.add_argument('--av_using_lstm', action='store_true', default=False, help='whether to use lstm in acoustic and visual modality')
     parser.add_argument('--Dataset', default='IEMOCAP', help='dataset to train and test', choices = ("IEMOCAP", "MELD"))
     parser.add_argument('--num_L', type=int, default=3, help='num_hyperconvs')
     parser.add_argument('--num_K', type=int, default=4, help='num_convs')
@@ -194,7 +193,7 @@ if __name__ == '__main__':
     print(timestamp_str)    
     print(args)
     
-    name_ = '_'+args.modals+'_'+args.graph_type+'_'+"av_using_lstm"+f"{args.av_using_lstm}"+args.Dataset
+    name_ = '_'+args.modals+'_'+args.graph_type+'_'+args.Dataset
     
         
         
@@ -247,26 +246,23 @@ if __name__ == '__main__':
 
 
     seed_everything(seed_number)
+    print(n_speakers)
     model = Model(args.base_model,
-                                D_m, D_g, D_e, graph_h,
-                                n_speakers=n_speakers,
-                                n_classes=n_classes,
-                                dropout=args.dropout,
-                                graph_type=args.graph_type,
-                                alpha=args.alpha,
-                                
-                                
-                                use_residue=args.use_residue,
-                                D_m_v = D_visual,
-                                D_m_a = D_audio,
-                                modals=args.modals,
-                                att_type=args.mm_fusion_mthd,
-                                av_using_lstm=args.av_using_lstm,
-                                dataset=args.Dataset,
-                                num_L = args.num_L,
-                                num_K = args.num_K,
-                               original_gcn= args.original_gcn,
-                                graph_masking=args.graph_masking)
+                  D_m, 
+                  D_g, 
+                  graph_h,
+                  n_speakers=n_speakers,
+                  n_classes=n_classes,
+                  dropout=args.dropout,
+                  alpha=args.alpha,
+                  D_m_v = D_visual,
+                  D_m_a = D_audio,
+                  modals=args.modals,
+                  att_type=args.mm_fusion_mthd,
+                  dataset=args.Dataset,
+                  num_L = args.num_L,
+                  num_K = args.num_K,
+                  graph_masking=args.graph_masking)
 
     print ('Graph NN with', args.base_model, 'as base model.')
     name = 'Graph'
@@ -311,7 +307,7 @@ if __name__ == '__main__':
 
 
 
-    model_save_dir = os.path.join("./save_folder", args.Dataset, f"original_av_using_lstm_{args.av_using_lstm}_self_attention_{args.self_attention}_graphmasking_{args.graph_masking}_originalgcn_{args.original_gcn}")
+    model_save_dir = os.path.join("./save_folder", args.Dataset, f"original__self_attention_{args.self_attention}_graphmasking_{args.graph_masking}_originalgcn_{args.original_gcn}")
     os.makedirs(model_save_dir, exist_ok=True)
     
     
@@ -370,8 +366,7 @@ if __name__ == '__main__':
         for i in range(len(class_f1)):
             result_dictionary[f"f1_{i}"] = class_f1[i]
 
-        mode_str = f"ORIGINAL_AV_LSTM_self_attention_{args.self_attention}_graph_masking_{args.graph_masking}_originalgcn_{args.original_gcn}" if args.av_using_lstm \
-                else f"ORIGINAL_self_attention_{args.self_attention}_graph_masking_{args.graph_masking}_originalgcn_{args.original_gcn}"
+        mode_str = f"ORIGINAL__attention_{args.self_attention}_graph_masking_{args.graph_masking}"
         result_dictionary["mode"] = mode_str
 
         # 모델 파일 이름

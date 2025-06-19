@@ -36,8 +36,7 @@ class FocalLoss(nn.Module):
         seq_length = logits.size(0)
 
         new_label = labels.unsqueeze(1)
-        # print(seq_length)
-        # print(labels_length)
+
         label_onehot = torch.zeros([seq_length, labels_length]).cuda().scatter_(1, new_label, 1)
 
         log_p = F.log_softmax(logits,-1)
@@ -119,45 +118,40 @@ class Model(nn.Module):
 
     def __init__(self, 
                  base_model, 
-                 D_m, D_g, D_e, 
+                 D_m,
+                 D_g, 
                  graph_hidden_size, 
                  n_speakers,
                  n_classes=7, 
                  dropout=0.5,  
-              
-                 graph_type='relation',
                  alpha=0.2, 
-                 use_residue=True,
                  D_m_v=512,
                  D_m_a=100,
                  modals='avl',
                  att_type='concat_DHT',
-                 av_using_lstm=False,
+                 modals_using_lstm = "avt", 
                  dataset='IEMOCAP',
-                 use_speaker=True,
+                 modals_spk_emb = "avt",
                  num_L = 3,
                  num_K = 4,
-                 modality_self_attention=False, 
                  original_gcn=False,
                  graph_masking=True):
         
         super(Model, self).__init__()
         self.original_gcn = original_gcn
         self.graph_masking = graph_masking
-        self.modality_self_attention = modality_self_attention
+
         self.base_model = base_model
        
        
-        self.graph_type=graph_type
+        
         self.alpha = alpha
        
         self.dropout = dropout
         
-        self.use_residue = use_residue
         
         self.return_feature = True
         self.modals = [x for x in modals]  # a, v, l
-        self.use_speaker = use_speaker
         self.att_type = att_type
         self.normBNa = nn.BatchNorm1d(1024, affine=True)
         self.normBNb = nn.BatchNorm1d(1024, affine=True)
@@ -166,7 +160,6 @@ class Model(nn.Module):
 
     
         self.multi_modal = True
-        self.av_using_lstm = av_using_lstm
        
         self.dataset = dataset
 
@@ -174,48 +167,35 @@ class Model(nn.Module):
     
         
         hidden_a = D_g
-        self.linear_a = nn.Linear(D_m_a, hidden_a)
-        if self.av_using_lstm:
-            self.lstm_a = nn.LSTM(input_size=hidden_a, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
-    
         hidden_v = D_g
-        self.linear_v = nn.Linear(D_m_v, hidden_v)
-        if self.av_using_lstm:
-            self.lstm_v = nn.LSTM(input_size=hidden_v, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
+        hidden_t = D_g
+
+
+
+        self.linear_a = nn.Linear(D_m_a, hidden_a)
+        self.lstm_a = nn.LSTM(input_size=hidden_a, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
     
-        hidden_l = D_g
-        self.linear_l = nn.Linear(D_m, hidden_l)
-        self.lstm_l = nn.LSTM(input_size=hidden_l, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
+        
+        self.linear_v = nn.Linear(D_m_v, hidden_v)
+        self.lstm_v = nn.LSTM(input_size=hidden_v, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
+    
+        
+        self.linear_t = nn.Linear(D_m, hidden_t)
+        self.lstm_t = nn.LSTM(input_size=hidden_t, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=dropout)
 
  
         self.align = MultiHeadCrossModalAttention(D_g, D_g, D_g, 2) 
 
         self.graph_model = GCN(n_dim=D_g, nhidden=graph_hidden_size, 
-                                        dropout=self.dropout, lamda=0.5, alpha=0.1, variant=True, return_feature=self.return_feature, use_residue=self.use_residue, n_speakers=n_speakers, modals=self.modals, use_speaker=self.use_speaker,  num_L=num_L, num_K=num_K, original_gcn=self.original_gcn, graph_masking=self.graph_masking)
-        print("construct "+self.graph_type)
+                                        dropout=self.dropout, lamda=0.5, alpha=0.1, variant=True, return_feature=self.return_feature,  n_speakers=n_speakers, modals=self.modals, num_L=num_L, num_K=num_K, original_gcn=self.original_gcn, graph_masking=self.graph_masking)
 
-        if self.multi_modal:
-            self.dropout_ = nn.Dropout(self.dropout)
-            self.hidfc = nn.Linear(graph_hidden_size, n_classes)
-          
-            if self.att_type == 'concat_DHT':
-                if self.use_residue:
-                    self.smax_fc = nn.Linear((D_g+graph_hidden_size*2)*len(self.modals), n_classes)
-                else:
-                    self.smax_fc = nn.Linear((graph_hidden_size*2)*len(self.modals), n_classes)
-          
-
-
-    # def _reverse_seq(self, X, mask):
-    #     X_ = X.transpose(0,1)
-    #     mask_sum = torch.sum(mask, 1).int()
-
-    #     xfs = []
-    #     for x, c in zip(X_, mask_sum):
-    #         xf = torch.flip(x[:c], [0])
-    #         xfs.append(xf)
-
-    #     return pad_sequence(xfs)
+        
+        self.dropout_ = nn.Dropout(self.dropout)
+        self.hidfc = nn.Linear(graph_hidden_size, n_classes)
+        
+        
+        self.smax_fc = nn.Linear((graph_hidden_size*2)*len(self.modals), n_classes)
+        
 
 
     def forward(self, U, qmask, umask, seq_lengths, U_a=None, U_v=None, epoch=None):
@@ -229,87 +209,39 @@ class Model(nn.Module):
         r3 = self.normBNc(r3.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
         r4 = self.normBNd(r4.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
 
-        U = (r1 + r2 + r3 + r4)/4
+        U_t = (r1 + r2 + r3 + r4)/4
        
-        if self.base_model == 'LSTM':
-            if not self.multi_modal:
-                if self.modals == "l":
-                    U = self.linear_l(U)
-                    emotions, _ = self.lstm(U)
-                elif self.modals == "v":
-                    U_v = self.linear_v(U_v)
-                    emotions = U_v
-                elif self.modals == "a":
-                    U_a = self.linear_a(U_a)
-                    emotions = U_a
-            else:
-                if self.av_using_lstm:
-                    if 'a' in self.modals:
-                        
-                        U_a = self.linear_a(U_a)
-                        
-                        emotions_a, _ = self.lstm_a(U_a)
-                        
-                    if 'v' in self.modals:
-                        U_v = self.linear_v(U_v)
-                        emotions_v, _ = self.lstm_v(U_v)
-                else:
+    
+    
+        
+        U_a = self.linear_a(U_a)        
+        emotions_a, _ = self.lstm_a(U_a)
+        U_v = self.linear_v(U_v)
+        emotions_v, _ = self.lstm_v(U_v)
+        U_t = self.linear_t(U_t)
+        emotions_l, _ = self.lstm_t(U_t)
+        
+            
+        
+    
+        emotions_a = self.align(emotions_a, emotions_l) 
+        emotions_v = self.align(emotions_v, emotions_l) 
                     
-                    emotions_a = self.linear_a(U_a)
-                    
-                    emotions_v = self.linear_v(U_v)
+    
 
-                if 'l' in self.modals:
-                    
-                    U = self.linear_l(U)
-                    
-                    emotions_l, _ = self.lstm_l(U)
-                    
-                    
-                if self.modality_self_attention:
-                    emotions_a = self.a_align(emotions_a, emotions_a)
-                    emotions_v = self.v_align(emotions_v, emotions_v)
-                    emotions_l = self.l_align(emotions_l, emotions_l)
-                
-                else:
-                    emotions_a = self.align(emotions_a, emotions_l) 
-                    emotions_v = self.align(emotions_v, emotions_l) 
-                    
-        if not self.multi_modal:
+        features_a = simple_batch_graphify(emotions_a, seq_lengths)
+        features_v = simple_batch_graphify(emotions_v, seq_lengths)
+        features_l = simple_batch_graphify(emotions_l, seq_lengths)
             
-            features = simple_batch_graphify(emotions, seq_lengths)
-        else:
-            if 'a' in self.modals:
-                features_a = simple_batch_graphify(emotions_a, seq_lengths)
-                
-            else:
-                features_a = []
-            if 'v' in self.modals:
-                features_v = simple_batch_graphify(emotions_v, seq_lengths)
-            else:
-                features_v = []
-            if 'l' in self.modals:
-                
-                
-                features_l = simple_batch_graphify(emotions_l, seq_lengths)
-                
-                
-            else:
-                features_l = []
-        if self.graph_type=='hyper':
-            emotions_feat = self.graph_model(features_a, features_v, features_l, seq_lengths, qmask, epoch)
+        
+        emotions_feat = self.graph_model(features_a, features_v, features_l, seq_lengths, qmask, epoch)        
+        emotions_feat = self.dropout_(emotions_feat)        
+        emotions_feat = nn.ReLU()(emotions_feat)
+        
             
-            emotions_feat = self.dropout_(emotions_feat)
+        log_prob = F.log_softmax(self.smax_fc(emotions_feat), 1)
             
-            emotions_feat = nn.ReLU()(emotions_feat)
-            
-            
-            # print(emotions_feat.shape)
-            log_prob = F.log_softmax(self.smax_fc(emotions_feat), 1)
-            
-        else:
-            print("There are no such kind of graph")   
-            
+     
         
         return log_prob
 
