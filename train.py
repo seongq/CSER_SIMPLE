@@ -16,7 +16,7 @@ from sklearn.metrics import f1_score, confusion_matrix, accuracy_score, classifi
 import pickle as pk
 import datetime
 import torch.nn.functional as F
-from utils import seed_everything,compute_detailed_metrics
+from utils import seed_everything,compute_detailed_metrics, str2bool
 from datetime import datetime
 import pytz
 # seed = 67137 # We use seed = 1475 on IEMOCAP and seed = 67137 on MELD
@@ -113,13 +113,27 @@ def train_or_eval_graph_model(model,
 
         
         lengths = [(umask[j] == 1).nonzero(as_tuple=False).tolist()[-1][0] + 1 for j in range(len(umask))]
-
-    
-        log_prob = model([textf1,textf2,textf3,textf4], qmask, lengths, acouf, visuf, epoch)
-    
-    
         label = torch.cat([label[j][:lengths[j]] for j in range(len(label))])
-        loss = loss_function(log_prob, label)
+        if args.MRL: # MRL 실행
+            if train: # train일 땐 logits 모아둔거랑, logit 나오니까
+                # print("MRL traing 중")
+                output_log_probs, log_prob = model([textf1,textf2,textf3,textf4], qmask, lengths, acouf, visuf, epoch)
+            else: # eval일 때 logit 하나만 나오지
+                # print("MRL eval중")
+                log_prob = model([textf1,textf2,textf3,textf4], qmask, lengths, acouf, visuf, epoch)
+            loss = loss_function(log_prob, label)
+            
+            if train: # 여러 logit에 대하여 loss 구해서 더해주기
+                for MRL_log_prob in output_log_probs:
+                    if args.MRL_loss_combination == "sum":
+                        loss += loss_function(MRL_log_prob, label) # 합하는게 좋다.
+                    elif args.MRL_loss_combination == "average":
+                        loss = loss/(len(output_log_probs)+1)
+            else: 
+                pass
+        else:
+            log_prob = model([textf1,textf2,textf3,textf4], qmask, lengths, acouf, visuf, epoch)
+            loss = loss_function(log_prob, label)
         preds.append(torch.argmax(log_prob, 1).cpu().numpy())
         labels.append(label.cpu().numpy())
         losses.append(loss.item())
@@ -164,7 +178,31 @@ if __name__ == '__main__':
     parser.add_argument("--spk_embs", default='avt', choices= ("NO", 'a', 'v', 't', 'av', 'at', 'vt', 'avt'))
     parser.add_argument("--using_lstms", default="avt", choices= ("NO", 'a', 'v', 't', 'av', 'at', 'vt', 'avt'))
     parser.add_argument("--aligns", default="to_t", choices= ("NO", "to_a", "to_v", "to_t"))
+    parser.add_argument("--MRL", type=str2bool, default=False)
+    parser.add_argument("--MRL_efficient", type=str2bool, default=False)
+    parser.add_argument("--num_MRL_partition", type=int, default=0)
+    parser.add_argument("--MRL_loss_combination", default="sum", choices=("NO", "sum", "average"))
     args = parser.parse_args()
+    
+    if (args.MRL == False) and (args.MRL_efficient==True):
+        raise RuntimeError("이거 안돌려야함")
+    
+    
+    
+    if (args.MRL == False) and (args.num_MRL_partition > 0):
+        raise RuntimeError("이거 안돌려야함")
+    
+    if (args.MRL == True) and (args.num_MRL_partition == 0):
+        raise RuntimeError("이거 안돌려야함")
+    
+    if (args.MRL == True) and (args.num_MRL_partition > 10):
+        raise RuntimeError("이거 안돌려야함")
+    
+    if (args.MRL == False) and (args.MRL_loss_combination != "NO"):
+        raise RuntimeError("이거 안돌려야함")
+    
+    if (args.MRL == True) and (args.MRL_loss_combination == "NO"):
+        raise RuntimeError("이거 안돌려야함")
     
     
     kst = pytz.timezone("Asia/Seoul")
@@ -172,7 +210,13 @@ if __name__ == '__main__':
     timestamp_str = now_kst.strftime("%Y%m%d%H%M")
     print(args)
     
-    main_name = "gnn_layers_"+str(args.num_graph_layers)+"_spk_embs_"+args.spk_embs+"_"+"using_lstms_"+args.using_lstms+"_"+"aligns_"+args.aligns+"_datasets_"+args.Dataset+"_"+"seed_"+str(args.seed_number)+f"_{timestamp_str}"
+    if args.MRL == True:
+        main_name = "MRL_"+f"partition_{args.num_MRL_partition}_"+"gnn_layers_"+str(args.num_graph_layers)+"_spk_embs_"+args.spk_embs+"_"+"using_lstms_"+args.using_lstms+"_"+"aligns_"+args.aligns+"_datasets_"+args.Dataset+"_"+"seed_"+str(args.seed_number)+f"_{timestamp_str}"
+        if args.MRL_efficient == True:
+            main_name = "MRL_efficient_"+f"partition_{args.num_MRL_partition}_"+"gnn_layers_"+str(args.num_graph_layers)+"_spk_embs_"+args.spk_embs+"_"+"using_lstms_"+args.using_lstms+"_"+"aligns_"+args.aligns+"_datasets_"+args.Dataset+"_"+"seed_"+str(args.seed_number)+f"_{timestamp_str}"
+        main_name = f"MRLCOMB_{args.MRL_loss_combination}_"+main_name
+    else:
+        main_name = "gnn_layers_"+str(args.num_graph_layers)+"_spk_embs_"+args.spk_embs+"_"+"using_lstms_"+args.using_lstms+"_"+"aligns_"+args.aligns+"_datasets_"+args.Dataset+"_"+"seed_"+str(args.seed_number)+f"_{timestamp_str}"
     
         
         
@@ -228,10 +272,15 @@ if __name__ == '__main__':
                   graph_masking=args.graph_masking,
                   spk_embs=args.spk_embs,
                     using_lstms = args.using_lstms,
-                    aligns =args.aligns                  
+                    aligns =args.aligns,
+                    MRL = args.MRL,
+                    MRL_efficient = args.MRL_efficient,
+                    num_MRL_partition = args.num_MRL_partition                    
                   )
 
-
+# parser.add_argument("--MRL", type=str2bool, default=False)
+#     parser.add_argument("--MRL_efficient", type=str2bool, default=False)
+#     parser.add_argument("--num_MRL_partition", type=int, default=3)
     if cuda:
         model.to(device)
 

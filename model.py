@@ -126,9 +126,17 @@ class Model(nn.Module):
                  graph_masking=True, 
                  spk_embs = None,
                  using_lstms = None,
-                 aligns = None):
+                 aligns = None, 
+                 MRL = None, 
+                 MRL_efficient = None,
+                 num_MRL_partition = None):
         
         super(Model, self).__init__()
+        
+        self.MRL = MRL
+        self.MRL_efficient = MRL_efficient
+        self.num_MRL_partition = num_MRL_partition
+        
         
         self.spk_embs = spk_embs
         self.using_lstms = using_lstms
@@ -192,7 +200,25 @@ class Model(nn.Module):
         self.dropout_ = nn.Dropout(self.dropout)
         self.smax_fc = nn.Linear((graph_hidden_size*2)*3, n_classes)
         
-
+        if self.MRL == True:
+            unit_hiddensizes = []
+            unit_temp_hiddensize = (graph_hidden_size*2)
+            for _ in range(self.num_MRL_partition):
+                unit_temp_hiddensize = unit_temp_hiddensize // 2
+                unit_hiddensizes.append(unit_temp_hiddensize)
+                
+            self.unit_hiddensizes = unit_hiddensizes
+            
+            
+            if self.MRL_efficient:
+                pass
+            
+            else:
+                self.last_layers = nn.ModuleList()
+                for unit_hiddensize in self.unit_hiddensizes:
+                    self.last_layers.append(nn.Linear(3 * unit_hiddensize, n_classes))
+                    
+            
 
     def forward(self, U, qmask, seq_lengths, U_a=None, U_v=None, epoch=None):
 
@@ -249,10 +275,28 @@ class Model(nn.Module):
         emotions_feat = self.graph_model(features_a, features_v, features_t, seq_lengths, qmask)        
         emotions_feat = self.dropout_(emotions_feat)        
         emotions_feat = nn.ReLU()(emotions_feat)
-        log_prob = F.log_softmax(self.smax_fc(emotions_feat), 1)
-            
-     
         
-        return log_prob
+        if self.MRL == True:
+            output_log_probs = []
+            uni_modality_length = emotions_feat.shape[-1]//3
+            if self.training:
+                for k, hiddensize in enumerate(self.unit_hiddensizes):
+                    x_selected = torch.cat([emotions_feat[:,i*uni_modality_length:i*uni_modality_length+hiddensize] for i in range(3)], dim=-1)
+                    if self.MRL_efficient:
+                        weight_selected = torch.cat([self.smax_fc.weight[:,i*uni_modality_length:i*uni_modality_length+hiddensize] for i in range(3)], dim=1)
+                        output_log_probs.append(F.log_softmax(x_selected@weight_selected.T+self.smax_fc.bias,1))
+                    else:                    
+                        output_log_probs.append(F.log_softmax(self.last_layers[k](x_selected), 1))
+                
+                log_prob = F.log_softmax(self.smax_fc(emotions_feat), 1)
+                return output_log_probs, log_prob
+            else:
+                log_prob = F.log_softmax(self.smax_fc(emotions_feat), 1)
+                return log_prob
+        
+        else: 
+            log_prob = F.log_softmax(self.smax_fc(emotions_feat), 1)
+                    
+            return log_prob
 
 
