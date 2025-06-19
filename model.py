@@ -214,35 +214,31 @@ class Model(nn.Module):
         r4 = self.normBNd(r4.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
 
         U_t = (r1 + r2 + r3 + r4)/4
-       
-    
-    
         
         U_a = self.linear_a(U_a)        
-        emotions_a, _ = self.lstm_a(U_a)
         U_v = self.linear_v(U_v)
-        emotions_v, _ = self.lstm_v(U_v)
         U_t = self.linear_t(U_t)
-        emotions_l, _ = self.lstm_t(U_t)
+        
+        emotions_a, _ = self.lstm_a(U_a)
+        emotions_v, _ = self.lstm_v(U_v)
+        emotions_t, _ = self.lstm_t(U_t)
         
             
         
     
-        emotions_a = self.align(emotions_a, emotions_l) 
-        emotions_v = self.align(emotions_v, emotions_l) 
+        emotions_a = self.align(emotions_a, emotions_t) 
+        emotions_v = self.align(emotions_v, emotions_t) 
                     
     
 
         features_a = simple_batch_graphify(emotions_a, seq_lengths)
         features_v = simple_batch_graphify(emotions_v, seq_lengths)
-        features_l = simple_batch_graphify(emotions_l, seq_lengths)
+        features_t = simple_batch_graphify(emotions_t, seq_lengths)
             
         
-        emotions_feat = self.graph_model(features_a, features_v, features_l, seq_lengths, qmask, epoch)        
+        emotions_feat = self.graph_model(features_a, features_v, features_t, seq_lengths, qmask, epoch)        
         emotions_feat = self.dropout_(emotions_feat)        
         emotions_feat = nn.ReLU()(emotions_feat)
-        
-            
         log_prob = F.log_softmax(self.smax_fc(emotions_feat), 1)
             
      
