@@ -15,8 +15,11 @@ class GCN(nn.Module):
                  num_graph_layers=4,
                  original_gcn=False,
                  graph_masking=True,
-                 spk_embs = None):
+                 spk_embs = None,
+                 mask_prob = None):
         super(GCN, self).__init__()
+        
+        self.mask_prob = mask_prob
         self.spk_embs = spk_embs
         self.return_feature = return_feature  #True
         
@@ -34,7 +37,7 @@ class GCN(nn.Module):
         self.num_graph_layers =  num_graph_layers
         
         for kk in range(self.num_graph_layers):
-            setattr(self,'conv%d' %(kk+1), GraphGCN(nhidden, nhidden,  graph_masking=self.graph_masking))
+            setattr(self,'conv%d' %(kk+1), GraphGCN(nhidden, nhidden,  graph_masking=self.graph_masking, mask_prob = self.mask_prob))
 
     def forward(self, a, v, l, dia_len, qmask):
         qmask = torch.cat([qmask[:x,i,:] for i,x in enumerate(dia_len)],dim=0)

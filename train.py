@@ -182,6 +182,10 @@ if __name__ == '__main__':
     parser.add_argument("--MRL_efficient", type=str2bool, default=False)
     parser.add_argument("--num_MRL_partition", type=int, default=0)
     parser.add_argument("--MRL_loss_combination", default="sum", choices=("NO", "sum", "average"))
+    
+    parser.add_argument("--num_heads", default=2, type=int)
+    parser.add_argument("--mask_prob", default=0.5, type=float)
+    
     args = parser.parse_args()
     
     if (args.MRL == False) and (args.MRL_efficient==True):
@@ -209,14 +213,17 @@ if __name__ == '__main__':
     now_kst = datetime.now(kst)
     timestamp_str = now_kst.strftime("%Y%m%d%H%M")
     print(args)
+    main_name = f"mask_prob_{args.mask_prob}_num_heads_{args.num_heads}_gnn_layers_{args.num_graph_layers}_spk_embs_{args.spk_embs}_using_lstms_{args.using_lstms}_aligns_{args.aligns}_datasets_{args.Dataset}_seed_{args.seed_number}_timestamp_str_{timestamp_str}"
     
     if args.MRL == True:
-        main_name = "MRL_"+f"partition_{args.num_MRL_partition}_"+"gnn_layers_"+str(args.num_graph_layers)+"_spk_embs_"+args.spk_embs+"_"+"using_lstms_"+args.using_lstms+"_"+"aligns_"+args.aligns+"_datasets_"+args.Dataset+"_"+"seed_"+str(args.seed_number)+f"_{timestamp_str}"
+        main_name = f"partition_{args.num_MRL_partition}_"+main_name
         if args.MRL_efficient == True:
-            main_name = "MRL_efficient_"+f"partition_{args.num_MRL_partition}_"+"gnn_layers_"+str(args.num_graph_layers)+"_spk_embs_"+args.spk_embs+"_"+"using_lstms_"+args.using_lstms+"_"+"aligns_"+args.aligns+"_datasets_"+args.Dataset+"_"+"seed_"+str(args.seed_number)+f"_{timestamp_str}"
+            main_name = "MRL_efficient_"+main_name
+        else:
+            main_name = "MRL_"+main_name
         main_name = f"MRLCOMB_{args.MRL_loss_combination}_"+main_name
     else:
-        main_name = "gnn_layers_"+str(args.num_graph_layers)+"_spk_embs_"+args.spk_embs+"_"+"using_lstms_"+args.using_lstms+"_"+"aligns_"+args.aligns+"_datasets_"+args.Dataset+"_"+"seed_"+str(args.seed_number)+f"_{timestamp_str}"
+        main_name = main_name
     
         
         
@@ -275,7 +282,9 @@ if __name__ == '__main__':
                     aligns =args.aligns,
                     MRL = args.MRL,
                     MRL_efficient = args.MRL_efficient,
-                    num_MRL_partition = args.num_MRL_partition                    
+                    num_MRL_partition = args.num_MRL_partition,
+                    num_heads = args.num_heads,
+                    mask_prob = args.mask_prob
                   )
 
 # parser.add_argument("--MRL", type=str2bool, default=False)

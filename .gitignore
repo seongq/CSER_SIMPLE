@@ -8,3 +8,4 @@ __pycache__/
 run*
 results_csv
 evaluate_jonghab.py
+jungri.py

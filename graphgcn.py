@@ -15,9 +15,9 @@ def generate_random_mask(num_nodes, num_features, mask_prob=0.5):
     return mask
 
 class GraphGCN(MessagePassing):
-    def __init__(self, in_channels, out_channels, aggr='add',  graph_masking=True):
+    def __init__(self, in_channels, out_channels, aggr='add',  graph_masking=True, mask_prob=None):
         super(GraphGCN, self).__init__(aggr='add')  # "Add" aggregation.
-        
+        self.mask_prob = mask_prob
         self.graph_masking = graph_masking
         
         
@@ -25,7 +25,7 @@ class GraphGCN(MessagePassing):
     def forward(self, x, edge_index):
         num_nodes, dim = x.shape
         if self.graph_masking:
-            mask = generate_random_mask(num_nodes, dim, mask_prob=0.5).to(x.device)
+            mask = generate_random_mask(num_nodes, dim, mask_prob=self.mask_prob).to(x.device)
             x = x * mask
 
         # For original GCN, use A+I

@@ -129,10 +129,13 @@ class Model(nn.Module):
                  aligns = None, 
                  MRL = None, 
                  MRL_efficient = None,
-                 num_MRL_partition = None):
+                 num_MRL_partition = None,
+                 num_heads = None,
+                 mask_prob =None):
         
         super(Model, self).__init__()
-        
+        self.mask_prob = mask_prob
+        self.num_heads = num_heads
         self.MRL = MRL
         self.MRL_efficient = MRL_efficient
         self.num_MRL_partition = num_MRL_partition
@@ -185,7 +188,7 @@ class Model(nn.Module):
             self.lstm_t = nn.LSTM(input_size=hidden_t, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=self.dropout)
 
  
-        self.align = MultiHeadCrossModalAttention(D_g, D_g, D_g, 2) 
+        self.align = MultiHeadCrossModalAttention(D_g, D_g, D_g, num_heads=self.num_heads) 
 
         self.graph_model = GCN(n_dim=D_g, 
                                nhidden=graph_hidden_size,
@@ -194,7 +197,8 @@ class Model(nn.Module):
                                n_speakers=n_speakers, 
                                num_graph_layers=num_graph_layers,
                                graph_masking=self.graph_masking,
-                               spk_embs = self.spk_embs,)
+                               spk_embs = self.spk_embs,
+                               mask_prob= self.mask_prob)
 
         
         self.dropout_ = nn.Dropout(self.dropout)
