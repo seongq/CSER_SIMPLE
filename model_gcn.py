@@ -16,8 +16,12 @@ class GCN(nn.Module):
                  original_gcn=False,
                  graph_masking=True,
                  spk_embs = None,
-                 mask_prob = None):
+                 mask_prob = None,
+                 uni_modal = None,
+                 spk_embs_uni_modal = None):
         super(GCN, self).__init__()
+        
+        self.uni_modal = None
         
         self.mask_prob = mask_prob
         self.spk_embs = spk_embs
@@ -44,12 +48,26 @@ class GCN(nn.Module):
         spk_idx = torch.argmax(qmask, dim=-1)
         spk_emb_vector = self.speaker_embeddings(spk_idx)
         
-        if "t" in self.spk_embs:
-            l += spk_emb_vector
-        elif "a" in self.spk_embs:
-            a += spk_emb_vector
-        elif "v" in self.spk_embs:
-            v += spk_emb_vector
+        if self.uni_modal:
+            if self.uni_modal== "a":
+                a += spk_emb_vector
+                
+            elif self.uni_modal == "v":
+                v += spk_emb_vector
+            elif self.uni_modal == "t":
+                t += spk_emb_vector    
+            
+            
+            else:
+                raise ValueError(f"Invalid uni_modal value: {self.uni_modal}. Must be one of ['a', 'v', 't']")
+        
+        else:
+            if "t" in self.spk_embs:
+                l += spk_emb_vector
+            elif "a" in self.spk_embs:
+                a += spk_emb_vector
+            elif "v" in self.spk_embs:
+                v += spk_emb_vector
 
            
         

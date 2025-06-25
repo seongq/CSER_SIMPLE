@@ -186,28 +186,31 @@ if __name__ == '__main__':
     parser.add_argument("--num_heads", default=2, type=int)
     parser.add_argument("--mask_prob", default=0.5, type=float)
     
+    
+    parser.add_argument("--debug_mode", default=True, type=str2bool, required=True)
+    
     args = parser.parse_args()
-    
-    if (args.MRL == False) and (args.MRL_efficient==True):
-        raise RuntimeError("이거 안돌려야함")
-    
-    
-    
-    if (args.MRL == False) and (args.num_MRL_partition > 0):
-        raise RuntimeError("이거 안돌려야함")
-    
-    if (args.MRL == True) and (args.num_MRL_partition == 0):
-        raise RuntimeError("이거 안돌려야함")
-    
-    if (args.MRL == True) and (args.num_MRL_partition > 10):
-        raise RuntimeError("이거 안돌려야함")
-    
-    if (args.MRL == False) and (args.MRL_loss_combination != "NO"):
-        raise RuntimeError("이거 안돌려야함")
-    
-    if (args.MRL == True) and (args.MRL_loss_combination == "NO"):
-        raise RuntimeError("이거 안돌려야함")
-    
+    if args.debug_mode:
+        print("[INFO] debug mode:")
+    else:
+        print("[INFO] not debug mode, real implementation")
+    assert not (not args.MRL and args.MRL_efficient), \
+    "MRL must be True when using MRL_efficient."
+
+    assert not (not args.MRL and args.num_MRL_partition > 0), \
+        "num_MRL_partition must be 0 when MRL is False."
+
+    assert not (args.MRL and args.num_MRL_partition == 0), \
+        "num_MRL_partition must be > 0 when MRL is True."
+
+    assert not (args.MRL and args.num_MRL_partition > 10), \
+        "num_MRL_partition must be <= 10 when MRL is True."
+
+    assert not (not args.MRL and args.MRL_loss_combination != "NO"), \
+        "MRL_loss_combination must be 'NO' when MRL is False."
+
+    assert not (args.MRL and args.MRL_loss_combination == "NO"), \
+        "MRL_loss_combination must not be 'NO' when MRL is True."
     
     kst = pytz.timezone("Asia/Seoul")
     now_kst = datetime.now(kst)
@@ -328,46 +331,62 @@ if __name__ == '__main__':
 
 
     model_save_dir = os.path.join("./save_folder", main_name)
-    os.makedirs(model_save_dir, exist_ok=True)
+    if args.debug_mode:
+        pass
+    else:
+        os.makedirs(model_save_dir, exist_ok=True)
     
     
     csv_path = os.path.join(f"./save_folder/{main_name}", "results.csv")
     
     temporary_csv_dir_path = os.path.dirname(csv_path)
-    os.makedirs(temporary_csv_dir_path, exist_ok=True)
+    
+    if args.debug_mode:
+        pass
+    else:
+        os.makedirs(temporary_csv_dir_path, exist_ok=True)
     
     
     import csv
     
-    if not os.path.isfile(csv_path):
-        with open(csv_path, mode="w", newline='') as f:
-            writer = csv.writer(f)
-            COLUMNS = []
-            COLUMNS.append('epoch')
-            
-          
-            COLUMNS.append("train_loss")
-            COLUMNS.append("train_acc")
-            COLUMNS.append("train_fscore")
-            COLUMNS.append("test_loss")
-            COLUMNS.append("test_acc")
-            COLUMNS.append("test_fscore")
-            
-            for i in range(n_classes):
-                COLUMNS.append(f'ACC_{i}')
+    if args.debug_mode:
+        pass
+    
+    else:
+        if not os.path.isfile(csv_path):
+            with open(csv_path, mode="w", newline='') as f:
+                writer = csv.writer(f)
+                COLUMNS = []
+                COLUMNS.append('epoch')
                 
+            
+                COLUMNS.append("train_loss")
+                COLUMNS.append("train_acc")
+                COLUMNS.append("train_fscore")
+                COLUMNS.append("test_loss")
+                COLUMNS.append("test_acc")
+                COLUMNS.append("test_fscore")
+                
+                for i in range(n_classes):
+                    COLUMNS.append(f'ACC_{i}')
+                    
 
-            for i in range(n_classes):
-                COLUMNS.append(f"F1_{i}")
-                
-            writer.writerow(COLUMNS)
+                for i in range(n_classes):
+                    COLUMNS.append(f"F1_{i}")
+                    
+                writer.writerow(COLUMNS)
     
     
     args_save_path = os.path.join(model_save_dir, "settings.json")
     
     # Namespace → dict 변환 후 저장
-    with open(args_save_path, "w") as f:
-        json.dump(vars(args), f, indent=4)
+    
+    if args.debug_mode:
+        pass
+    else:
+            
+        with open(args_save_path, "w") as f:
+            json.dump(vars(args), f, indent=4)
     
     
     for e in range(n_epochs):
@@ -414,22 +433,31 @@ if __name__ == '__main__':
         model_path = os.path.join(model_save_dir, filename)
         
         
-        with open(csv_path, mode='a', newline='') as f:
-            writer = csv.writer(f)
-            CONTENTS = [epoch, train_loss, train_acc, train_fscore, test_loss, test_acc, test_fscore ]
-            for i in range(n_classes): #ACC
-                CONTENTS.append(round(class_accuracy[i], 2))
-            for i in range(n_classes): #F1
-                CONTENTS.append(round(class_f1[i], 2))
-            writer.writerow(CONTENTS)
+        
+        if args.debug_mode:
+            pass
+        
+        else:
+            with open(csv_path, mode='a', newline='') as f:
+                writer = csv.writer(f)
+                CONTENTS = [epoch, train_loss, train_acc, train_fscore, test_loss, test_acc, test_fscore ]
+                for i in range(n_classes): #ACC
+                    CONTENTS.append(round(class_accuracy[i], 2))
+                for i in range(n_classes): #F1
+                    CONTENTS.append(round(class_f1[i], 2))
+                writer.writerow(CONTENTS)
 
-        # 모델 저장
-        torch.save({
-            "model_state_dict": model.state_dict(),
-            "args": vars(args),
-            "metrics": f1_metrics,
-            "seed": seed_number,
-        }, model_path)
+
+        if args.debug_mode:
+            pass
+        else:
+            # 모델 저장
+            torch.save({
+                "model_state_dict": model.state_dict(),
+                "args": vars(args),
+                "metrics": f1_metrics,
+                "seed": seed_number,
+            }, model_path)
 
        
         elapsed_time = round(time.time() - start_time, 2)
@@ -439,8 +467,16 @@ if __name__ == '__main__':
         print(f"  ▶ Valid Loss: {valid_loss:.4f}, Acc: {valid_acc:.2f}%, F1: {valid_fscore:.2f}")
         print(f"  ▶ Test  Loss: {test_loss:.4f},  Acc: {test_acc:.2f}%, F1: {test_fscore:.2f}")
         print(f"  ▶ Weighted Accuracy: {weighted_accuracy:.2f}%, Weighted F1: {weighted_f1:.2f}")
-        print(f"  ▶ Saved model to: {model_path}")
+        if not args.debug_mode:
+            print(f"  ▶ Saved model to: {model_path}")
+        else:
+            print(f" Debug mode, models are not saved.")
         print(f"  ⏱ Time elapsed: {elapsed_time} sec")
         print("-" * 60)
+        print(f"  ⚙️ Model settings summary:")
+        for k, v in vars(args).items():
+            print(f"     - {k}: {v}")
+        print("-" * 60)
+
                     
     
