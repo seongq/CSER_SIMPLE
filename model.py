@@ -132,9 +132,61 @@ class Model(nn.Module):
                  num_MRL_partition = None,
                  num_heads = None,
                  mask_prob =None,
-                 MKD = None):
+                 MKD = None, 
+
+                 num_graph_layers_a=4,
+                 num_graph_layers_v=4,
+                 num_graph_layers_t=4,
+                 graph_masking_a=True,
+                 graph_masking_v=True,
+                 graph_masking_t=True,
+                 spk_embs_uni_modal_a=True,
+                 spk_embs_uni_modal_v=True,
+                 spk_embs_uni_modal_t=True,
+                 lstm_unimodal_a=True,
+                 lstm_unimodal_v=True,
+                 lstm_unimodal_t=True,
+                 aligns_uni_modal_a=True,
+                 aligns_uni_modal_v=True,
+                 aligns_uni_modal_t=True,
+                 num_heads_a=2,
+                 num_heads_v=2,
+                 num_heads_t=2,
+                 mask_prob_a=0.5,
+                 mask_prob_v=0.5,
+                 mask_prob_t=0.5,
+                 ):
         
         super(Model, self).__init__()
+        self.num_graph_layers_a=num_graph_layers_a
+        self.graph_masking_a=graph_masking_a
+        self.spk_embs_uni_modal_a=spk_embs_uni_modal_a
+        self.lstm_unimodal_a=lstm_unimodal_a
+        self.aligns_uni_modal_a=aligns_uni_modal_a
+        self.num_heads_a=num_heads_a
+        self.mask_prob_a=mask_prob_a
+        
+        
+        self.num_graph_layers_v=num_graph_layers_v
+        self.graph_masking_v=graph_masking_v
+        self.spk_embs_uni_modal_v=spk_embs_uni_modal_v
+        self.lstm_unimodal_v=lstm_unimodal_v
+        self.aligns_uni_modal_v=aligns_uni_modal_v
+        self.num_heads_v=num_heads_v
+        self.mask_prob_v=mask_prob_v
+        
+        
+        self.num_graph_layers_t=num_graph_layers_t
+        self.graph_masking_t=graph_masking_t
+        self.spk_embs_uni_modal_t=spk_embs_uni_modal_t
+        self.lstm_unimodal_t=lstm_unimodal_t
+        self.aligns_uni_modal_t=aligns_uni_modal_t
+        self.num_heads_t=num_heads_t
+        self.mask_prob_t=mask_prob_t
+        
+        
+        
+        self.MKD = MKD
         self.mask_prob = mask_prob
         self.num_heads = num_heads
         self.MRL = MRL
@@ -205,6 +257,59 @@ class Model(nn.Module):
         self.dropout_ = nn.Dropout(self.dropout)
         self.smax_fc = nn.Linear((graph_hidden_size*2)*3, n_classes)
         
+        
+        if self.MKD == True:
+            print("MKD 시작")
+            self.unimodel_a = UniModel("a",
+                                  D_m=D_m,
+                                  D_g=D_g, 
+                                  graph_hidden_size=graph_hidden_size,
+                                  n_speakers=n_speakers,
+                                  n_classes=n_classes, 
+                                  dropout=dropout,
+                                  D_m_v=D_m_v,
+                                  D_m_a=D_m_a,
+                                  num_graph_layers=self.num_graph_layers_a,
+                                  graph_masking=self.graph_masking_a, 
+                                  spk_embs_uni_modal = self.spk_embs_uni_modal_a,
+                                  lstm_unimodal = self.lstm_unimodal_a,
+                                  aligns_uni_modal = self.aligns_uni_modal_a, 
+                                  num_heads = self.num_heads_a,
+                                  mask_prob =self.mask_prob_a)
+            self.unimodel_v = UniModel("v",
+                                  D_m=D_m,
+                                  D_g=D_g, 
+                                  graph_hidden_size=graph_hidden_size,
+                                  n_speakers=n_speakers,
+                                  n_classes=n_classes, 
+                                  dropout=dropout,
+                                  D_m_v=D_m_v,
+                                  D_m_a=D_m_a,
+                                  num_graph_layers=self.num_graph_layers_v,
+                                  graph_masking=self.graph_masking_v, 
+                                  spk_embs_uni_modal = self.spk_embs_uni_modal_v,
+                                  lstm_unimodal = self.lstm_unimodal_v,
+                                  aligns_uni_modal = self.aligns_uni_modal_v, 
+                                  num_heads = self.num_heads_v,
+                                  mask_prob =self.mask_prob_v)
+            self.unimodel_t = UniModel("t",
+                                  D_m=D_m,
+                                  D_g=D_g, 
+                                  graph_hidden_size=graph_hidden_size,
+                                  n_speakers=n_speakers,
+                                  n_classes=n_classes, 
+                                  dropout=dropout,
+                                  D_m_v=D_m_v,
+                                  D_m_a=D_m_a,
+                                  num_graph_layers=self.num_graph_layers_t,
+                                  graph_masking=self.graph_masking_t, 
+                                  spk_embs_uni_modal = self.spk_embs_uni_modal_t,
+                                  lstm_unimodal = self.lstm_unimodal_t,
+                                  aligns_uni_modal = self.aligns_uni_modal_t, 
+                                  num_heads = self.num_heads_t,
+                                  mask_prob =self.mask_prob_t)
+        
+        
         if self.MRL == True:
             unit_hiddensizes = []
             unit_temp_hiddensize = (graph_hidden_size*2)
@@ -227,6 +332,13 @@ class Model(nn.Module):
 
     def forward(self, U, qmask, seq_lengths, U_a=None, U_v=None, epoch=None):
 
+        if self.MKD:
+            emotions_feat_uni_a = self.unimodel_a(U, qmask, seq_lengths, U_a, U_v, epoch)
+            emotions_feat_uni_v = self.unimodel_v(U, qmask, seq_lengths, U_a, U_v, epoch)
+            emotions_feat_uni_t = self.unimodel_t(U, qmask, seq_lengths, U_a, U_v, epoch)
+        
+        
+        
         #=============roberta features
         [r1,r2,r3,r4]=U
         seq_len, _, feature_dim = r1.size()
@@ -242,7 +354,7 @@ class Model(nn.Module):
         U_v = self.linear_v(U_v)
         U_t = self.linear_t(U_t)
         
-        
+        # print(U_a.size())
         if "a" in self.using_lstms:
             emotions_a, _ = self.lstm_a(U_a)
         else:
@@ -275,11 +387,17 @@ class Model(nn.Module):
         features_a = simple_batch_graphify(emotions_a, seq_lengths)
         features_v = simple_batch_graphify(emotions_v, seq_lengths)
         features_t = simple_batch_graphify(emotions_t, seq_lengths)
-            
         
-        emotions_feat = self.graph_model(features_a, features_v, features_t, seq_lengths, qmask)        
+        
+        emotions_feat = self.graph_model(features_a, features_v, features_t, seq_lengths, qmask)   
+        
+        # print(emotions_feat.size())     
         emotions_feat = self.dropout_(emotions_feat)        
         emotions_feat = nn.ReLU()(emotions_feat)
+        
+        
+        
+        
         
         if self.MRL == True:
             output_log_probs = []
@@ -301,8 +419,25 @@ class Model(nn.Module):
         
         else: 
             log_prob = F.log_softmax(self.smax_fc(emotions_feat), 1)
+            
+            
+            if self.MKD:
+                if self.training:
+                    # print(log_prob.size())  
+                    log_prob_a = emotions_feat_uni_a      
+                    log_prob_v = emotions_feat_uni_v      
+                    log_prob_t = emotions_feat_uni_t      
                     
-            return log_prob
+                    # print(log_prob_a.size())
+                    # print(log_prob_v.size())
+                    # print(log_prob_t.size())
+                    
+                    return log_prob, log_prob_a, log_prob_v, log_prob_t
+                else:
+                    return log_prob
+
+            else:
+                return log_prob
         
         
         
@@ -310,9 +445,10 @@ class Model(nn.Module):
 class UniModel(nn.Module):
 
     def __init__(self, 
+                 uni_modal,
                  D_m,
                  D_g, 
-                 graph_hidden_size, 
+                 graph_hidden_size,
                  n_speakers,
                  n_classes=7, 
                  dropout=0.5,  
@@ -320,32 +456,28 @@ class UniModel(nn.Module):
                  D_m_a=100,
                  num_graph_layers = 4,
                  graph_masking=True, 
-                 spk_embs = None,
-                 using_lstms = None,
-                 aligns = None, 
-                 MRL = None, 
-                 MRL_efficient = None,
-                 num_MRL_partition = None,
+                 spk_embs_uni_modal = None,
+                 lstm_unimodal = None,
+                 aligns_uni_modal = None, 
+
                  num_heads = None,
-                 mask_prob =None,
-                 MKD = None):
-        
+                 mask_prob =None):
+    
+            
         super(UniModel, self).__init__()
+        
+        self.uni_modal = uni_modal
         self.mask_prob = mask_prob
         self.num_heads = num_heads
-        self.MRL = MRL
-        self.MRL_efficient = MRL_efficient
-        self.num_MRL_partition = num_MRL_partition
         
         
-        self.spk_embs = spk_embs
-        self.using_lstms = using_lstms
-        self.aligns = aligns
+        self.lstm_unimodal = lstm_unimodal
+        self.aligns_uni_modal = aligns_uni_modal
         
-        self.graph_masking = graph_masking
+        self.graph_masking= graph_masking
 
        
-       
+        self.spk_embs_uni_modal = spk_embs_uni_modal
         
        
         self.dropout = dropout
@@ -353,39 +485,26 @@ class UniModel(nn.Module):
         
         self.return_feature = True
         
-        
-        
-        self.normBNa = nn.BatchNorm1d(1024, affine=True)
-        self.normBNb = nn.BatchNorm1d(1024, affine=True)
-        self.normBNc = nn.BatchNorm1d(1024, affine=True)
-        self.normBNd = nn.BatchNorm1d(1024, affine=True)
+        hidden_D = D_g
+        if self.uni_modal== "t":
+            self.normBNa = nn.BatchNorm1d(1024, affine=True)
+            self.normBNb = nn.BatchNorm1d(1024, affine=True)
+            self.normBNc = nn.BatchNorm1d(1024, affine=True)
+            self.normBNd = nn.BatchNorm1d(1024, affine=True)
 
-    
-       
-   
-        
-        hidden_a = D_g
-        hidden_v = D_g
-        hidden_t = D_g
+        if self.uni_modal == "a":
+            self.linear = nn.Linear(D_m_a, hidden_D)
+            
+        elif self.uni_modal == "v":
+            self.linear = nn.Linear(D_m_v, hidden_D)
+        elif self.uni_modal == "t":
+            self.linear = nn.Linear(D_m, hidden_D)
+            
+        if self.lstm_unimodal:
+            self.lstm = nn.LSTM(input_size=hidden_D, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=self.dropout)
 
-        self.linear_a = nn.Linear(D_m_a, hidden_a)
-        if "a" in self.using_lstms:
-            self.lstm_a = nn.LSTM(input_size=hidden_a, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=self.dropout)
-    
-        
-        self.linear_v = nn.Linear(D_m_v, hidden_v)
-        
-        if "v" in self.using_lstms:
-            self.lstm_v = nn.LSTM(input_size=hidden_v, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=self.dropout)
-    
-        
-        self.linear_t = nn.Linear(D_m, hidden_t)
-        
-        if "t" in self.using_lstms:
-            self.lstm_t = nn.LSTM(input_size=hidden_t, hidden_size=D_g//2, num_layers=2, bidirectional=True, dropout=self.dropout)
-
- 
-        self.align = MultiHeadCrossModalAttention(D_g, D_g, D_g, num_heads=self.num_heads) 
+        if self.aligns_uni_modal:
+            self.align = MultiHeadCrossModalAttention(D_g, D_g, D_g, num_heads=self.num_heads) 
 
         self.graph_model = GCN(n_dim=D_g, 
                                nhidden=graph_hidden_size,
@@ -394,110 +513,60 @@ class UniModel(nn.Module):
                                n_speakers=n_speakers, 
                                num_graph_layers=num_graph_layers,
                                graph_masking=self.graph_masking,
-                               spk_embs = self.spk_embs,
-                               mask_prob= self.mask_prob)
+                               spk_embs = None,
+                               mask_prob= self.mask_prob, 
+                               uni_modal = self.uni_modal,
+                               spk_embs_uni_modal = self.spk_embs_uni_modal)
 
         
         self.dropout_ = nn.Dropout(self.dropout)
-        self.smax_fc = nn.Linear((graph_hidden_size*2)*3, n_classes)
+        self.smax_fc = nn.Linear((graph_hidden_size*2), n_classes)
         
-        if self.MRL == True:
-            unit_hiddensizes = []
-            unit_temp_hiddensize = (graph_hidden_size*2)
-            for _ in range(self.num_MRL_partition):
-                unit_temp_hiddensize = unit_temp_hiddensize // 2
-                unit_hiddensizes.append(unit_temp_hiddensize)
-                
-            self.unit_hiddensizes = unit_hiddensizes
-            
-            
-            if self.MRL_efficient:
-                pass
-            
-            else:
-                self.last_layers = nn.ModuleList()
-                for unit_hiddensize in self.unit_hiddensizes:
-                    self.last_layers.append(nn.Linear(3 * unit_hiddensize, n_classes))
-                    
-            
-
+       
     def forward(self, U, qmask, seq_lengths, U_a=None, U_v=None, epoch=None):
 
         #=============roberta features
-        [r1,r2,r3,r4]=U
-        seq_len, _, feature_dim = r1.size()
+        
+        if self.uni_modal == "t":
+            [r1,r2,r3,r4]=U
+            seq_len, _, feature_dim = r1.size()
 
-        r1 = self.normBNa(r1.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
-        r2 = self.normBNb(r2.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
-        r3 = self.normBNc(r3.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
-        r4 = self.normBNd(r4.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
+            r1 = self.normBNa(r1.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
+            r2 = self.normBNb(r2.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
+            r3 = self.normBNc(r3.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
+            r4 = self.normBNd(r4.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
 
-        U_t = (r1 + r2 + r3 + r4)/4
+            U = (r1 + r2 + r3 + r4)/4
+            U = self.linear(U)
+            
+        if self.uni_modal == "a":
+            U = self.linear(U_a)        
+            
+        elif self.uni_modal == "v":
+            U = self.linear(U_v)
+
         
-        U_a = self.linear_a(U_a)        
-        U_v = self.linear_v(U_v)
-        U_t = self.linear_t(U_t)
         
+        if self.lstm_unimodal:
         
-        if "a" in self.using_lstms:
-            emotions_a, _ = self.lstm_a(U_a)
+            emotions, _ = self.lstm(U)
         else:
-            emotions_a = U_a
-        if "v" in self.using_lstms:
-            emotions_v, _ = self.lstm_v(U_v)
-        else:
-            emotions_v = U_v
-        if "t" in self.using_lstms:
-            emotions_t, _ = self.lstm_t(U_t)
-        else:
-            emotions_t = U_t
+            emotions = U
         
-        if self.aligns=="to_t":
-            
-            emotions_a = self.align(emotions_a, emotions_t) 
-            emotions_v = self.align(emotions_v, emotions_t) 
-    
-        elif self.aligns=="to_v":
-            emotions_a = self.align(emotions_a, emotions_v)
-            emotions_t = self.align(emotions_t, emotions_v)
-            
-        elif self.aligns == "to_a":
-            emotions_v = self.align(emotions_v, emotions_a)
-            emotions_t = self.align(emotions_t, emotions_a)
-            
-        elif self.aligns == "NO":
-            pass
-            
-        features_a = simple_batch_graphify(emotions_a, seq_lengths)
-        features_v = simple_batch_graphify(emotions_v, seq_lengths)
-        features_t = simple_batch_graphify(emotions_t, seq_lengths)
-            
         
-        emotions_feat = self.graph_model(features_a, features_v, features_t, seq_lengths, qmask)        
+        if self.aligns_uni_modal:
+            
+            emotions = self.align(emotions, emotions) 
+            
+       
+        features = simple_batch_graphify(emotions, seq_lengths)
+                
+        emotions_feat = self.graph_model(features, features, features, seq_lengths, qmask)        
         emotions_feat = self.dropout_(emotions_feat)        
         emotions_feat = nn.ReLU()(emotions_feat)
         
-        if self.MRL == True:
-            output_log_probs = []
-            uni_modality_length = emotions_feat.shape[-1]//3
-            if self.training:
-                for k, hiddensize in enumerate(self.unit_hiddensizes):
-                    x_selected = torch.cat([emotions_feat[:,i*uni_modality_length:i*uni_modality_length+hiddensize] for i in range(3)], dim=-1)
-                    if self.MRL_efficient:
-                        weight_selected = torch.cat([self.smax_fc.weight[:,i*uni_modality_length:i*uni_modality_length+hiddensize] for i in range(3)], dim=1)
-                        output_log_probs.append(F.log_softmax(x_selected@weight_selected.T+self.smax_fc.bias,1))
-                    else:                    
-                        output_log_probs.append(F.log_softmax(self.last_layers[k](x_selected), 1))
+        log_prob = F.log_softmax(self.smax_fc(emotions_feat), 1)
                 
-                log_prob = F.log_softmax(self.smax_fc(emotions_feat), 1)
-                return output_log_probs, log_prob
-            else:
-                log_prob = F.log_softmax(self.smax_fc(emotions_feat), 1)
-                return log_prob
-        
-        else: 
-            log_prob = F.log_softmax(self.smax_fc(emotions_feat), 1)
-                    
-            return log_prob
+        return log_prob
 
 

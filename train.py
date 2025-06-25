@@ -135,6 +135,7 @@ def train_or_eval_graph_model(model,
             log_prob = model([textf1,textf2,textf3,textf4], qmask, lengths, acouf, visuf, epoch)
             loss = loss_function(log_prob, label)
         preds.append(torch.argmax(log_prob, 1).cpu().numpy())
+        # print(preds)
         labels.append(label.cpu().numpy())
         losses.append(loss.item())
         if train:
@@ -168,7 +169,7 @@ if __name__ == '__main__':
     parser.add_argument('--l2', type=float, default=0.00003, metavar='L2', help='L2 regularization weight')
     parser.add_argument('--dropout', type=float, default=0.5, metavar='dropout', help='dropout rate')
     parser.add_argument('--batch_size', type=int, default=16, metavar='BS', help='batch size')
-    parser.add_argument('--epochs', type=int, default=100, metavar='E', help='number of epochs')
+    parser.add_argument('--epochs', type=int, default=200, metavar='E', help='number of epochs')
 
     parser.add_argument('--Dataset', default='IEMOCAP', help='dataset to train and test', choices = ("IEMOCAP", "MELD"))
     parser.add_argument('--num_graph_layers', type=int, default=4, help='num of GNN layers')
@@ -185,7 +186,40 @@ if __name__ == '__main__':
     
     parser.add_argument("--num_heads", default=2, type=int)
     parser.add_argument("--mask_prob", default=0.5, type=float)
+    parser.add_argument("--MKD", default=False, required=False, type=str2bool)
     
+    
+    
+    parser.add_argument("--num_graph_layers_a", default=4, type=int)
+    parser.add_argument("--num_graph_layers_v", default=4, type=int)
+    parser.add_argument("--num_graph_layers_t", default=4, type=int)
+    
+    parser.add_argument("--graph_masking_a", default=True, type=str2bool)
+    parser.add_argument("--graph_masking_v", default=True, type=str2bool)
+    parser.add_argument("--graph_masking_t", default=True, type=str2bool)
+    
+    parser.add_argument("--spk_embs_uni_modal_a", default=True, type=str2bool)
+    parser.add_argument("--spk_embs_uni_modal_v", default=True, type=str2bool)
+    parser.add_argument("--spk_embs_uni_modal_t", default=True, type=str2bool)
+    
+    parser.add_argument("--lstm_unimodal_a", type=str2bool, default=True)
+    parser.add_argument("--lstm_unimodal_v", type=str2bool, default=True)
+    parser.add_argument("--lstm_unimodal_t", type=str2bool, default=True)
+    
+    parser.add_argument("--aligns_uni_modal_a", type=str2bool, default=True)
+    parser.add_argument("--aligns_uni_modal_v", type=str2bool, default=True)
+    parser.add_argument("--aligns_uni_modal_t", type=str2bool, default=True)
+    
+    parser.add_argument("--num_heads_a", type=int, default=2)
+    parser.add_argument("--num_heads_v", type=int, default=2)
+    parser.add_argument("--num_heads_t", type=int, default=2)
+    
+    parser.add_argument("--mask_prob_a", type=float, default=0.5)
+    parser.add_argument("--mask_prob_v", type=float, default=0.5)
+    parser.add_argument("--mask_prob_t", type=float, default=0.5)
+    
+    parser.add_argument("--auxillary_classifier", type=str2bool, default=True)
+        
     
     parser.add_argument("--debug_mode", default=True, type=str2bool, required=True)
     
@@ -227,6 +261,9 @@ if __name__ == '__main__':
         main_name = f"MRLCOMB_{args.MRL_loss_combination}_"+main_name
     else:
         main_name = main_name
+        
+    
+    main_name = f"MKD_{args.MKD}_"+main_name
     
         
         
@@ -257,10 +294,7 @@ if __name__ == '__main__':
     D_m = 1024
     
     D_g = 512 if args.Dataset=='IEMOCAP' else 1024
-    D_p = 150
-    D_e = 100
-    D_h = 100
-    D_a = 100
+
     graph_h = 512
     
     
@@ -287,7 +321,29 @@ if __name__ == '__main__':
                     MRL_efficient = args.MRL_efficient,
                     num_MRL_partition = args.num_MRL_partition,
                     num_heads = args.num_heads,
-                    mask_prob = args.mask_prob
+                    mask_prob = args.mask_prob,
+                    MKD = args.MKD,
+                    num_graph_layers_a=args.num_graph_layers_a,
+                 num_graph_layers_v=args.num_graph_layers_v,
+                 num_graph_layers_t=args.num_graph_layers_t,
+                 graph_masking_a=args.graph_masking_a,
+                 graph_masking_v=args.graph_masking_v,
+                 graph_masking_t=args.graph_masking_t,
+                 spk_embs_uni_modal_a=args.spk_embs_uni_modal_a,
+                 spk_embs_uni_modal_v=args.spk_embs_uni_modal_v,
+                 spk_embs_uni_modal_t=args.spk_embs_uni_modal_t,
+                 lstm_unimodal_a=args.lstm_unimodal_a,
+                 lstm_unimodal_v=args.lstm_unimodal_v,
+                 lstm_unimodal_t=args.lstm_unimodal_t,
+                 aligns_uni_modal_a=args.aligns_uni_modal_a,
+                 aligns_uni_modal_v=args.aligns_uni_modal_v,
+                 aligns_uni_modal_t=args.aligns_uni_modal_t,
+                 num_heads_a=args.num_heads_a,
+                 num_heads_v=args.num_heads_v,
+                 num_heads_t=args.num_heads_t,
+                 mask_prob_a=args.mask_prob_a,
+                 mask_prob_v=args.mask_prob_v,
+                 mask_prob_t=args.mask_prob_t
                   )
 
 # parser.add_argument("--MRL", type=str2bool, default=False)
@@ -390,6 +446,7 @@ if __name__ == '__main__':
     
     
     for e in range(n_epochs):
+        print(main_name)
         epoch = str(e).zfill(3)
         print(f"epoch: {epoch} ")
 
@@ -473,9 +530,9 @@ if __name__ == '__main__':
             print(f" Debug mode, models are not saved.")
         print(f"  ⏱ Time elapsed: {elapsed_time} sec")
         print("-" * 60)
-        print(f"  ⚙️ Model settings summary:")
-        for k, v in vars(args).items():
-            print(f"     - {k}: {v}")
+        # print(f"  ⚙️ Model settings summary:")
+        # for k, v in vars(args).items():
+        #     print(f"     - {k}: {v}")
         print("-" * 60)
 
                     
