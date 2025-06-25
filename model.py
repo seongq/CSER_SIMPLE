@@ -308,6 +308,9 @@ class Model(nn.Module):
                                   aligns_uni_modal = self.aligns_uni_modal_t, 
                                   num_heads = self.num_heads_t,
                                   mask_prob =self.mask_prob_t)
+            self.smax_fc_t = nn.Linear(graph_hidden_size*2, n_classes)
+            self.smax_fc_v = nn.Linear(graph_hidden_size*2, n_classes)
+            self.smax_fc_a = nn.Linear(graph_hidden_size*2, n_classes)
         
         
         if self.MRL == True:
@@ -424,15 +427,28 @@ class Model(nn.Module):
             if self.MKD:
                 if self.training:
                     # print(log_prob.size())  
-                    log_prob_a = emotions_feat_uni_a      
-                    log_prob_v = emotions_feat_uni_v      
-                    log_prob_t = emotions_feat_uni_t      
+                    log_prob_a_teacher = emotions_feat_uni_a      
+                    log_prob_v_teacher = emotions_feat_uni_v      
+                    log_prob_t_teacher = emotions_feat_uni_t      
                     
-                    # print(log_prob_a.size())
-                    # print(log_prob_v.size())
-                    # print(log_prob_t.size())
                     
-                    return log_prob, log_prob_a, log_prob_v, log_prob_t
+                    length_emotions_feat = emotions_feat.shape[-1]
+                    uni_feat_length = length_emotions_feat//3
+                    emotions_feat_t = emotions_feat[:, 0:uni_feat_length]
+                    # print(emotions_feat.shape)
+                    # print(emotions_feat_l.shape)
+                    emotions_feat_a = emotions_feat[:, uni_feat_length:2*uni_feat_length]
+                    emotions_feat_v = emotions_feat[:, 2*uni_feat_length:]
+                    
+                    score_t = self.smax_fc_t(emotions_feat_t) 
+                    score_a = self.smax_fc_a(emotions_feat_a)
+                    score_v = self.smax_fc_v(emotions_feat_v)
+                        
+                    log_prob_t = F.log_softmax(score_t,1)
+                    log_prob_a = F.log_softmax(score_a, 1)
+                    log_prob_v = F.log_softmax(score_v, 1)
+                    
+                    return log_prob, log_prob_a,log_prob_v,log_prob_t, log_prob_a_teacher, log_prob_v_teacher, log_prob_t_teacher
                 else:
                     return log_prob
 
