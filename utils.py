@@ -1,6 +1,13 @@
 import numpy as np, argparse, time, random
 import torch
 
+def str2int_or_none(v):
+    if v == 'None':
+        return None
+    try:
+        return int(v)
+    except:
+        raise argparse.ArgumentTypeError(f"Invalid int or None value: {v}")
 
 
 def str2bool(v):

@@ -155,9 +155,15 @@ class Model(nn.Module):
                  mask_prob_a=0.5,
                  mask_prob_v=0.5,
                  mask_prob_t=0.5,
+                 MKD_a_layer = 0,
+                 MKD_v_layer = 0,
+                 MKD_t_layer = 0
                  ):
         
         super(Model, self).__init__()
+        self.MKD_a_layer = MKD_a_layer
+        self.MKD_v_layer = MKD_v_layer
+        self.MKD_t_layer = MKD_t_layer
         self.num_graph_layers_a=num_graph_layers_a
         self.graph_masking_a=graph_masking_a
         self.spk_embs_uni_modal_a=spk_embs_uni_modal_a
@@ -251,7 +257,11 @@ class Model(nn.Module):
                                num_graph_layers=num_graph_layers,
                                graph_masking=self.graph_masking,
                                spk_embs = self.spk_embs,
-                               mask_prob= self.mask_prob)
+                               mask_prob= self.mask_prob,
+                               MKD = self.MKD, 
+                               MKD_a_layer=self.MKD_a_layer ,
+                               MKD_v_layer=self.MKD_v_layer ,
+                               MKD_t_layer=self.MKD_t_layer )
 
         
         self.dropout_ = nn.Dropout(self.dropout)
@@ -387,12 +397,17 @@ class Model(nn.Module):
         elif self.aligns == "NO":
             pass
             
+        # print("graph 들어가기전:",emotions_a.size())
+            
         features_a = simple_batch_graphify(emotions_a, seq_lengths)
         features_v = simple_batch_graphify(emotions_v, seq_lengths)
         features_t = simple_batch_graphify(emotions_t, seq_lengths)
         
-        
-        emotions_feat = self.graph_model(features_a, features_v, features_t, seq_lengths, qmask)   
+        if self.MKD:
+            emotions_feat, emotions_feat_MM_a, emotions_feat_MM_v, emotions_feat_MM_t = self.graph_model(features_a, features_v, features_t, seq_lengths, qmask)   
+           
+        else:
+            emotions_feat = self.graph_model(features_a, features_v, features_t, seq_lengths, qmask)   
         
         # print(emotions_feat.size())     
         emotions_feat = self.dropout_(emotions_feat)        
@@ -431,14 +446,14 @@ class Model(nn.Module):
                     log_prob_v_teacher = emotions_feat_uni_v      
                     log_prob_t_teacher = emotions_feat_uni_t      
                     
-                    
+                    # print("teacher embedding size: ", log_prob_a_teacher.size())
                     length_emotions_feat = emotions_feat.shape[-1]
                     uni_feat_length = length_emotions_feat//3
-                    emotions_feat_t = emotions_feat[:, 0:uni_feat_length]
+                    emotions_feat_t = emotions_feat_MM_t[:, 0:uni_feat_length]
                     # print(emotions_feat.shape)
                     # print(emotions_feat_l.shape)
-                    emotions_feat_a = emotions_feat[:, uni_feat_length:2*uni_feat_length]
-                    emotions_feat_v = emotions_feat[:, 2*uni_feat_length:]
+                    emotions_feat_a = emotions_feat_MM_a[:, uni_feat_length:2*uni_feat_length]
+                    emotions_feat_v = emotions_feat_MM_v[:, 2*uni_feat_length:]
                     
                     score_t = self.smax_fc_t(emotions_feat_t) 
                     score_a = self.smax_fc_a(emotions_feat_a)
@@ -574,9 +589,9 @@ class UniModel(nn.Module):
             
             emotions = self.align(emotions, emotions) 
             
-       
+        # print("unimodal graph 들어가기전", emotions.size())
         features = simple_batch_graphify(emotions, seq_lengths)
-                
+            
         emotions_feat = self.graph_model(features, features, features, seq_lengths, qmask)        
         emotions_feat = self.dropout_(emotions_feat)        
         emotions_feat = nn.ReLU()(emotions_feat)

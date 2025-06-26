@@ -16,7 +16,7 @@ from sklearn.metrics import f1_score, confusion_matrix, accuracy_score, classifi
 import pickle as pk
 import datetime
 import torch.nn.functional as F
-from utils import seed_everything,compute_detailed_metrics, str2bool
+from utils import seed_everything,compute_detailed_metrics, str2bool, str2int_or_none
 from datetime import datetime
 import pytz
 # seed = 67137 # We use seed = 1475 on IEMOCAP and seed = 67137 on MELD
@@ -222,7 +222,7 @@ if __name__ == '__main__':
     parser.add_argument("--MRL", type=str2bool, default=False)
     parser.add_argument("--MRL_efficient", type=str2bool, default=False)
     parser.add_argument("--num_MRL_partition", type=int, default=0)
-    parser.add_argument("--MRL_loss_combination", default="sum", choices=("NO", "sum", "average"))
+    parser.add_argument("--MRL_loss_combination", default="NO", choices=("NO", "sum", "average"))
     
     parser.add_argument("--num_heads", default=2, type=int)
     parser.add_argument("--mask_prob", default=0.5, type=float)
@@ -261,6 +261,12 @@ if __name__ == '__main__':
     parser.add_argument("--auxillary_classifier", type=str, default="avt", choices=("a", "v", "t", "av", "at", "vt", "avt"))
         
     
+    parser.add_argument("--MKD_a_layer", type=str2int_or_none)
+    parser.add_argument("--MKD_v_layer", type=str2int_or_none)
+    parser.add_argument("--MKD_t_layer", type=str2int_or_none)
+
+
+    
     parser.add_argument("--debug_mode", default=True, type=str2bool)
     
     args = parser.parse_args()
@@ -290,43 +296,67 @@ if __name__ == '__main__':
     
     assert not (args.MKD_online and not args.MKD), \
     "MKD must be True when MKD_online is True."
+    if args.MKD:
+        assert args.MKD_a_layer is not None and args.MKD_v_layer is not None and args.MKD_t_layer is not None, \
+            "When MKD is True, MKD_a_layer, MKD_v_layer, MKD_t_layer must be provided."
+
+        for name, value in {
+            "MKD_a_layer": args.MKD_a_layer,
+            "MKD_v_layer": args.MKD_v_layer,
+            "MKD_t_layer": args.MKD_t_layer
+        }.items():
+            assert isinstance(value, int), f"{name} must be an integer."
+            assert -1 <= value <= args.num_graph_layers, \
+                f"{name} ({value}) must be between -1 and num_graph_layers ({args.num_graph_layers})."
+    else:
+        assert args.MKD_a_layer is None and args.MKD_v_layer is None and args.MKD_t_layer is None, \
+            "When MKD is False, MKD_a_layer, MKD_v_layer, MKD_t_layer must not be set."
+    
+    #####################graph hiddensize######
+    graph_h = 512
+    for name, num_heads_value in {
+    "num_heads": args.num_heads,
+    "num_heads_a": args.num_heads_a,
+    "num_heads_v": args.num_heads_v,
+    "num_heads_t": args.num_heads_t
+}.items():
+        assert graph_h % num_heads_value == 0, \
+            f"{name} ({num_heads_value}) must divide graph_h ({graph_h}) evenly."
+    
+    
     
     # timestamp
+    from datetime import datetime
+    import pytz
+
+    # timestamp (맨 앞)
     kst = pytz.timezone("Asia/Seoul")
     now_kst = datetime.now(kst)
-    timestamp_str = now_kst.strftime("%Y%m%d%H%M")
+    timestamp_str = now_kst.strftime("%Y%m%d%H%M%S")  # 초 단위 포함
 
-    # 기본 이름 구성 요소
-    parts = [
-        f"mask_prob_{args.mask_prob}",
-        f"num_heads_{args.num_heads}",
-        f"gnn_layers_{args.num_graph_layers}",
-        f"spk_embs_{args.spk_embs}",
-        f"using_lstms_{args.using_lstms}",
-        f"aligns_{args.aligns}",
-        f"datasets_{args.Dataset}",
-        f"seed_{args.seed_number}",
-        f"MKD_{args.MKD}",
-        f"timestamp_{timestamp_str}"
-    ]
+    # MRL / MKD 상태 태그
+    if args.MRL_efficient:
+        mrl_status = "MRL_efficient"
+    elif args.MRL:
+        mrl_status = "MRL"
+    else:
+        mrl_status = "noMRL"
 
-    # MRL 관련 설정 추가
-    if args.MRL:
-        parts.insert(0, f"partition_{args.num_MRL_partition}")
-        parts.insert(0, f"MRLCOMB_{args.MRL_loss_combination}")
-        prefix = "MRL_efficient" if args.MRL_efficient else "MRL"
-        parts.insert(0, prefix)
+    mkd_status = "MKD" if args.MKD else "noMKD"
+    mkd_online_status = "MKD_online" if args.MKD_online else "noMKD_online"
+    dataset_status = f"Dataset_{args.Dataset}"
 
-    # 최종 이름 생성
-    main_name = "_".join(parts)
+    # 필요한 정보만 조합해서 main_name 생성
+    main_name = "_".join([
+        f"timestamp_{timestamp_str}",
+        mrl_status,
+        mkd_status,
+        mkd_online_status,
+        dataset_status
+    ])
     print(main_name)
-    
         
-        
-    # print(main_name)
-
-    
-    
+   
 
     args.cuda = torch.cuda.is_available() and not args.no_cuda
     if args.cuda:
@@ -351,7 +381,6 @@ if __name__ == '__main__':
     
     D_g = 512 if args.Dataset=='IEMOCAP' else 1024
 
-    graph_h = 512
     
     
     n_speakers = 9 if args.Dataset=='MELD' else 2
@@ -399,7 +428,10 @@ if __name__ == '__main__':
                  num_heads_t=args.num_heads_t,
                  mask_prob_a=args.mask_prob_a,
                  mask_prob_v=args.mask_prob_v,
-                 mask_prob_t=args.mask_prob_t
+                 mask_prob_t=args.mask_prob_t,
+                 MKD_a_layer=args.MKD_a_layer,
+                 MKD_v_layer=args.MKD_v_layer,
+                 MKD_t_layer=args.MKD_t_layer,
                   )
 
 # parser.add_argument("--MRL", type=str2bool, default=False)

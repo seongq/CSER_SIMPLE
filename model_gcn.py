@@ -16,8 +16,19 @@ class GCN(nn.Module):
                  spk_embs = None,
                  mask_prob = None,
                  uni_modal = None,
-                 spk_embs_uni_modal = None):
+                 spk_embs_uni_modal = None,
+                 MKD = None,
+                 MKD_a_layer=None,
+                MKD_v_layer=None,
+                MKD_t_layer=None,
+                 
+                 ):
         super(GCN, self).__init__()
+        
+        self.MKD = MKD
+        self.MKD_a_layer = MKD_a_layer
+        self.MKD_v_layer = MKD_v_layer
+        self.MKD_t_layer = MKD_t_layer
         
         self.uni_modal = uni_modal
         self.spk_embs_uni_modal = spk_embs_uni_modal
@@ -73,18 +84,69 @@ class GCN(nn.Module):
         
         
         gnn_edge_index, gnn_features = self.create_gnn_index(a, v, l, dia_len)
-        x1 = self.fc1(gnn_features)  
-        out = x1
-        gnn_out = x1
-        for kk in range(self.num_graph_layers):
-            gnn_out = gnn_out + getattr(self,'conv%d' %(kk+1))(gnn_out,gnn_edge_index)
-            # print(gnn_out.size())
-        out2 = torch.cat([out,gnn_out], dim=1)
-        # print(out2.size())
         
-        out1 = self.reverse_features(dia_len, out2)
-        # print(out1.size())
-        return out1
+        
+        
+        if (not self.uni_modal) and self.MKD:
+            outputs = {}
+            outputs['total']=None
+            outputs['a_layer']=None
+            outputs['v_layer']=None
+            outputs['t_layer']=None
+            #gnn_features 는 -1, torch.cat([gnn_features,gnn_features])
+           
+            if self.MKD_a_layer == -1:
+                outputs['a_layer'] = self.reverse_features(dia_len, torch.cat([gnn_features,gnn_features], dim=1))
+            if self.MKD_v_layer == -1:
+                outputs['v_layer'] = self.reverse_features(dia_len, torch.cat([gnn_features,gnn_features], dim=1))
+            if self.MKD_t_layer == -1:
+                outputs['t_layer'] = self.reverse_features(dia_len, torch.cat([gnn_features,gnn_features], dim=1))
+          
+            x1 = self.fc1(gnn_features)  #x1은 0 , torch.cat([x1, out])
+           
+            out = x1
+            gnn_out = x1
+            
+            if self.MKD_a_layer == 0:
+                outputs['a_layer'] = self.reverse_features(dia_len, torch.cat([out,gnn_out], dim=1))
+            if self.MKD_v_layer == 0:
+                outputs['v_layer'] = self.reverse_features(dia_len, torch.cat([out,gnn_out], dim=1))
+            if self.MKD_t_layer == 0:
+                outputs['t_layer'] = self.reverse_features(dia_len, torch.cat([out,gnn_out], dim=1))
+            
+            
+            
+            for kk in range(self.num_graph_layers):
+                gnn_out = gnn_out + getattr(self,'conv%d' %(kk+1))(gnn_out,gnn_edge_index)
+                if self.MKD_a_layer == kk+1:
+                    outputs['a_layer'] = self.reverse_features(dia_len, torch.cat([out,gnn_out], dim=1))
+                if self.MKD_v_layer == kk+1:
+                    outputs['v_layer'] = self.reverse_features(dia_len, torch.cat([out,gnn_out], dim=1))
+                if self.MKD_t_layer == kk+1:
+                    outputs['t_layer'] = self.reverse_features(dia_len, torch.cat([out,gnn_out], dim=1))
+       
+            out2 = torch.cat([out,gnn_out], dim=1)
+            
+            out1 = self.reverse_features(dia_len, out2)
+            outputs['total'] = out1
+            return outputs['total'], outputs['a_layer'], outputs['v_layer'], outputs['t_layer']     
+        else:
+            #gnn_features 는 -1, torch.cat([gnn_features,gnn_features])
+        
+            
+            x1 = self.fc1(gnn_features)  #x1은 0 , torch.cat([x1, out])
+        
+            out = x1
+            gnn_out = x1
+            for kk in range(self.num_graph_layers):
+                gnn_out = gnn_out + getattr(self,'conv%d' %(kk+1))(gnn_out,gnn_edge_index)
+               
+            out2 = torch.cat([out,gnn_out], dim=1)
+            
+            
+            out1 = self.reverse_features(dia_len, out2)
+            
+            return out1
 
     def reverse_features(self, dia_len, features):
         if self.uni_modal:
