@@ -138,13 +138,25 @@ def train_or_eval_graph_model(model,
                 loss_v_teacher = loss_function(log_prob_v_teacher, label)
                 loss_t_teacher = loss_function(log_prob_t_teacher, label)
                 
+                loss_teacher = loss_a_teacher + loss_v_teacher + loss_t_teacher
+                
+                if args.MKD_online:
+                    optimizer.zero_grad()
+                    loss_teacher.backward()
+                    optimizer.step()
+                    optimizer.zero_grad()
+                    
                 log_prob_a_pseudo = log_prob_a_teacher.detach()
                 log_prob_v_pseudo = log_prob_v_teacher.detach()
                 log_prob_t_pseudo = log_prob_t_teacher.detach()
                 
                 loss_kd = F.kl_div(log_prob_a,log_prob_a_pseudo, log_target=True,reduction="batchmean") + F.kl_div( log_prob_v,log_prob_v_pseudo, log_target=True,reduction="batchmean")+F.kl_div(log_prob_t, log_prob_t_pseudo, log_target=True,reduction="batchmean")
                 
-                loss = loss_a_teacher + loss_v_teacher + loss_t_teacher + loss_kd
+                if args.MKD_online:
+                    loss = loss_kd
+                
+                else:
+                    loss = loss_teacher + loss_kd
                 
                 if "a" in args.auxillary_classifier:
                     loss += loss_function(log_prob_a, label)
@@ -168,6 +180,7 @@ def train_or_eval_graph_model(model,
         if train:
             loss.backward()
             optimizer.step()
+            optimizer.zero_grad()
 
     if preds!=[]:
         preds  = np.concatenate(preds)
@@ -214,7 +227,7 @@ if __name__ == '__main__':
     parser.add_argument("--num_heads", default=2, type=int)
     parser.add_argument("--mask_prob", default=0.5, type=float)
     parser.add_argument("--MKD", default=False,  type=str2bool)
-    
+    parser.add_argument("--MKD_online", default=False, type=str2bool)
     
     
     parser.add_argument("--num_graph_layers_a", default=4, type=int)
@@ -274,7 +287,9 @@ if __name__ == '__main__':
         "MRL_loss_combination must not be 'NO' when MRL is True."
         
     assert not (args.MRL==True and args.MKD == True)
-        
+    
+    assert not (args.MKD_online and not args.MKD), \
+    "MKD must be True when MKD_online is True."
     
     # timestamp
     kst = pytz.timezone("Asia/Seoul")
