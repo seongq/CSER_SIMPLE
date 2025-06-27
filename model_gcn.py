@@ -84,6 +84,7 @@ class GCN(nn.Module):
         
         
         gnn_edge_index, gnn_features = self.create_gnn_index(a, v, l, dia_len)
+        # print(gnn_features.size())
         
         
         
@@ -96,15 +97,17 @@ class GCN(nn.Module):
             #gnn_features 는 -1, torch.cat([gnn_features,gnn_features])
            
             if self.MKD_a_layer == -1:
-                outputs['a_layer'] = self.reverse_features(dia_len, torch.cat([gnn_features,gnn_features], dim=1))
+                outputs['a_layer'] = self.reverse_features(dia_len, gnn_features)
             if self.MKD_v_layer == -1:
-                outputs['v_layer'] = self.reverse_features(dia_len, torch.cat([gnn_features,gnn_features], dim=1))
+                outputs['v_layer'] = self.reverse_features(dia_len, gnn_features)
             if self.MKD_t_layer == -1:
-                outputs['t_layer'] = self.reverse_features(dia_len, torch.cat([gnn_features,gnn_features], dim=1))
+                outputs['t_layer'] = self.reverse_features(dia_len, gnn_features)
           
             x1 = self.fc1(gnn_features)  #x1은 0 , torch.cat([x1, out])
-           
+            # print(gnn_features.size())
+            
             out = x1
+            # print(out.size())
             gnn_out = x1
             
             if self.MKD_a_layer == 0:

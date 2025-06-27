@@ -178,6 +178,7 @@ def train_or_eval_graph_model(model,
         labels.append(label.cpu().numpy())
         losses.append(loss.item())
         if train:
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -206,10 +207,10 @@ if __name__ == '__main__':
 
     parser.add_argument('--no_cuda', action='store_true', default=False, help='does not use GPU')
     parser.add_argument('--lr', type=float, default=0.0001, metavar='LR', help='learning rate')
-    parser.add_argument('--l2', type=float, default=0.00003, metavar='L2', help='L2 regularization weight')
+    parser.add_argument('--l2', type=float, default=0.00005, metavar='L2', help='L2 regularization weight')
     parser.add_argument('--dropout', type=float, default=0.5, metavar='dropout', help='dropout rate')
     parser.add_argument('--batch_size', type=int, default=16, metavar='BS', help='batch size')
-    parser.add_argument('--epochs', type=int, default=200, metavar='E', help='number of epochs')
+    parser.add_argument('--epochs', type=int, default=100, metavar='E', help='number of epochs')
 
     parser.add_argument('--Dataset', default='IEMOCAP', help='dataset to train and test', choices = ("IEMOCAP", "MELD"))
     parser.add_argument('--num_graph_layers', type=int, default=4, help='num of GNN layers')
@@ -306,8 +307,8 @@ if __name__ == '__main__':
             "MKD_t_layer": args.MKD_t_layer
         }.items():
             assert isinstance(value, int), f"{name} must be an integer."
-            assert -1 <= value <= args.num_graph_layers, \
-                f"{name} ({value}) must be between -1 and num_graph_layers ({args.num_graph_layers})."
+            assert 0 <= value <= args.num_graph_layers, \
+                f"{name} ({value}) must be between 0 and num_graph_layers ({args.num_graph_layers})."
     else:
         assert args.MKD_a_layer is None and args.MKD_v_layer is None and args.MKD_t_layer is None, \
             "When MKD is False, MKD_a_layer, MKD_v_layer, MKD_t_layer must not be set."

@@ -354,19 +354,22 @@ class Model(nn.Module):
         
         #=============roberta features
         [r1,r2,r3,r4]=U
+        # print(r1.size())
         seq_len, _, feature_dim = r1.size()
 
         r1 = self.normBNa(r1.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
+        # print(r1.size())
         r2 = self.normBNb(r2.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
         r3 = self.normBNc(r3.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
         r4 = self.normBNd(r4.transpose(0, 1).reshape(-1, feature_dim)).reshape(-1, seq_len, feature_dim).transpose(1, 0)
 
         U_t = (r1 + r2 + r3 + r4)/4
-        
+        # print(U_t.size())
+        # print(U_a.size())
         U_a = self.linear_a(U_a)        
         U_v = self.linear_v(U_v)
         U_t = self.linear_t(U_t)
-        
+        # print(U_a.size())
         # print(U_a.size())
         if "a" in self.using_lstms:
             emotions_a, _ = self.lstm_a(U_a)
@@ -447,16 +450,18 @@ class Model(nn.Module):
                     log_prob_t_teacher = emotions_feat_uni_t      
                     
                     # print("teacher embedding size: ", log_prob_a_teacher.size())
-                    length_emotions_feat = emotions_feat.shape[-1]
+                    length_emotions_feat = emotions_feat_MM_t.shape[-1]
                     uni_feat_length = length_emotions_feat//3
                     emotions_feat_t = emotions_feat_MM_t[:, 0:uni_feat_length]
                     # print(emotions_feat.shape)
                     # print(emotions_feat_l.shape)
                     emotions_feat_a = emotions_feat_MM_a[:, uni_feat_length:2*uni_feat_length]
                     emotions_feat_v = emotions_feat_MM_v[:, 2*uni_feat_length:]
-                    
+                    # print(emotions_feat_MM_v.size())
                     score_t = self.smax_fc_t(emotions_feat_t) 
                     score_a = self.smax_fc_a(emotions_feat_a)
+                    # print(emotions_feat_a.size())
+                    # print(emotions_feat_v.size())
                     score_v = self.smax_fc_v(emotions_feat_v)
                         
                     log_prob_t = F.log_softmax(score_t,1)
