@@ -259,7 +259,7 @@ if __name__ == '__main__':
     parser.add_argument("--mask_prob_v", type=float, default=0.5)
     parser.add_argument("--mask_prob_t", type=float, default=0.5)
     
-    parser.add_argument("--auxillary_classifier", type=str, default="avt", choices=("a", "v", "t", "av", "at", "vt", "avt"))
+    parser.add_argument("--auxillary_classifier", type=str, default="avt", choices=("NONE", "a", "v", "t", "av", "at", "vt", "avt"))
         
     
     parser.add_argument("--MKD_a_layer", type=str2int_or_none)
